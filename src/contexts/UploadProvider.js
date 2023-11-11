@@ -49,218 +49,165 @@ export default function UploadProvider({ children }) {
     // INFORMATION STATES
     const [loadingResponse, setLoadingResponse] = useState(false)
 
-    // SAVE FUNCTIONS
+    // SAVE ON DATABASE FUNCTIONS
     const saveMovie = async () => {
-        const video_name = clearTitle(dataForm.title)
-        let movieData = { ...movieE, ...dataForm }
+        // Turn to true the backdrop loading
+        setLoadingResponse(true)
 
-        const response = await saveDataOnDB(movieData)
+        // Unifique the response from TMDB and the form edited data
+        const data = { ...movieE, ...dataForm }
 
-        if (!response || response.resStatus !== "success") {
+        // Save the element in the database and return the object created
+        const saveResponse = await saveData(data)
+
+        //  If the response is an error, do not upload files
+        if (saveResponse.resStatus !== "success") {
             return
         }
 
-        movieData = response._r
+        // Create a new name with specific rules
+        const filename = clearTitle(data.title)
 
-        const video_response = await uploadVideo(video_name)
-        movieData = { ...movieData, video_path: video_response.path }
+        // Upload de video file and update the movie data in the database
+        uploadFile(videoFile, 'video', filename, saveResponse._r._id)
 
-        if (dataForm.backdrop_path.includes('blob')) {
-            const backdrop_response = await uploadImage(video_name, "backdrop")
-            movieData = { ...movieData, backdrop_path: backdrop_response.path }
-        }
+        // If the poster file is local upload the image and update the path in the movie data
         if (dataForm.poster_path.includes('blob')) {
-            const poster_response = await uploadImage(video_name, "poster")
-            movieData = { ...movieData, poster_path: poster_response.path }
+            uploadFile(posterFile, 'image', filename, saveResponse._r._id, 'movie', 'poster')
         }
 
-        const newData = {
-            video_path: movieData.video_path,
-            backdrop_path: movieData.backdrop_path,
-            poster_path: movieData.poster_path
+        // If the backdrop file is local upload the image and update the path in the movie data
+        if (dataForm.backdrop_path.includes('blob')) {
+            uploadFile(backdropFile, 'image', filename, saveResponse._r._id, 'movie', 'backdrop')
         }
-
-        updateDataOnDB(newData, 'movie', movieData._id)
     }
     const saveSerie = async () => {
-        let serieData = { ...serieE, ...dataForm }
+        setLoadingResponse(true)
 
-        const responseDB = await saveDataOnDB(serieData)
+        const data = { ...serieE, ...dataForm }
 
-        if (!responseDB || responseDB.resStatus !== "success") {
+        const saveResponse = await saveData(data)
+
+        if (saveResponse.resStatus !== "success") {
             return
         }
 
-        serieData = responseDB._r
+        const filename = clearTitle(data.title)
 
-        const video_name = clearTitle(dataForm.title)
+        if (dataForm.poster_path.includes('blob')) {
+            uploadFile(posterFile, 'image', filename, saveResponse._r._id, 'tv', 'poster')
+        }
 
         if (dataForm.backdrop_path.includes('blob')) {
-            const backdrop_response = await uploadImage(video_name, "backdrop")
-            serieData = { ...serieData, backdrop_path: backdrop_response.path }
+            uploadFile(backdropFile, 'image', filename, saveResponse._r._id, 'tv', 'backdrop')
         }
-        if (dataForm.poster_path.includes('blob')) {
-            const poster_response = await uploadImage(video_name, "poster")
-            serieData = { ...serieData, poster_path: poster_response.path }
-        }
-
-        const newData = {
-            video_path: serieData.video_path,
-            backdrop_path: serieData.backdrop_path,
-            poster_path: serieData.poster_path
-        }
-
-        updateDataOnDB(newData, 'tv', serieData._id)
     }
     const saveSeason = async () => {
-        let seasonData = { ...seasonE, ...dataForm }
+        setLoadingResponse(true)
 
-        const serieElement = await getDBSerieElementByName(seasonData.title)
+        const data = { ...seasonE, ...dataForm }
 
-        if (!serieElement || serieElement.resStatus !== "success") {
+        const serie = await getDBSerieElementByName(data.title)
+
+        if (serie._r === undefined) {
             return
         }
 
-        const responseDB = await saveDataOnDB(seasonData, 'season', serieElement._r._id)
+        const saveResponse = await saveData(data, 'season', serie._r._id)
 
-        if (!responseDB || responseDB.resStatus !== "success") {
+        if (saveResponse.resStatus !== "success") {
             return
         }
 
-        seasonData = responseDB._r
-
-        const video_name = clearTitle(dataForm.title)
+        const filename = clearTitle(data.title)
 
         if (dataForm.poster_path.includes('blob')) {
-            const poster_response = await uploadImage(video_name, "poster")
-            seasonData = { ...seasonData, poster_path: poster_response.path }
+            uploadFile(posterFile, 'image', filename, saveResponse._r._id, 'season', 'poster')
         }
-
-        const newData = {
-            poster_path: seasonData.poster_path
-        }
-
-        updateDataOnDB(newData, 'season', seasonData._id)
     }
     const saveEpisode = async () => {
-        let episodeData = { ...episodeE, ...dataForm }
+        setLoadingResponse(true)
 
-        const serieElement = await getDBSerieElementByName(episodeData.title)
+        const data = { ...episodeE, ...dataForm }
 
-        if (!serieElement || serieElement.resStatus !== "success") {
+        const serie = await getDBSerieElementByName(data.title)
+
+        if (serie._r === undefined) {
             return
         }
 
-        const existSeason = serieElement._r.seasons.filter(s => s.season === episodeData.season_number * 1)
+        const season = serie._r.seasons.filter(s => s.season === data.season_number * 1)
 
-        if (existSeason.length < 1) {
+        if (season.length < 1) {
             return enqueueSnackbar('Temporada no encontrada, debes guardarla primero', { variant: 'error' })
         }
+        const saveResponse = await saveData(data, 'episode', season[0].id)
 
-        const responseDB = await saveDataOnDB(episodeData, 'episode', existSeason[0].id)
-
-        if (!responseDB || responseDB.resStatus !== "success") {
+        if (saveResponse.resStatus !== "success") {
             return
         }
 
-        episodeData = responseDB._r
+        const filename = clearTitle(dataForm.title)
 
-        const video_name = clearTitle(dataForm.title)
-
-        const video_response = await uploadVideo(video_name)
-        episodeData = { ...episodeData, video_path: video_response.path }
+        uploadFile(videoFile, 'video', filename, saveResponse._r._id)
 
         if (dataForm.backdrop_path.includes('blob')) {
-            const backdrop_response = await uploadImage(video_name, "backdrop")
-            episodeData = { ...episodeData, backdrop_path: backdrop_response.path }
+            uploadFile(backdropFile, 'image', filename, saveResponse._r._id, 'episode', 'backdrop')
         }
-
-        const newData = {
-            video_path: episodeData.video_path,
-            backdrop_path: episodeData.backdrop_path
-        }
-
-        updateDataOnDB(newData, 'episode', episodeData._id)
     }
-    // BACKEND INTERACTIVE FUNCTIONS
-    const uploadVideo = async (video_name) => {
+    const saveData = async (data, type, id) => {
         setLoadingResponse(true)
-
-        const formData = new FormData()
-
-        formData.append('video', videoFile)
-
-        return fetch(`${REACT_APP_API_URL}/upload/video/${searchType}/${video_name}`, {
-            method: "POST",
-            body: formData
-        })
-            .then(response => response.json())
-            .then(response => {
-                setResponse(response)
-                return response;
-            })
-            .catch(err => errorResponse(err))
-    }
-    const uploadImage = async (name, type) => {
-        setLoadingResponse(true)
-
-        const formData = new FormData()
-
-        formData.append('image', (type === "poster" ? posterFile : backdropFile))
-
-        return fetch(`${REACT_APP_API_URL}/upload/image/${type}/${name}-${type}`, {
-            method: "POST",
-            body: formData
-        })
-            .then(response => response.json())
-            .then(response => {
-                setResponse(response)
-                return response
-            })
-            .catch(err => errorResponse(err))
-    }
-    const saveDataOnDB = async (fileData, type, id) => {
-        setLoadingResponse(true)
-
-        const complement = type === "episode" ? '/episode/' + id : '/season/' + id
-
-        const queryUrl = `${REACT_APP_API_URL}/${searchType}${type === undefined ? "" : complement}`
-
-        return fetch(queryUrl, {
+        // console.log(`${REACT_APP_API_URL}/${searchType}${type ? '/' + type : ''}${id ? '/' + id : ''}`)
+        return await fetch(`${REACT_APP_API_URL}/${searchType}${type ? '/' + type : ''}${id ? '/' + id : ''}`, {
             method: 'POST',
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(fileData)
+            body: JSON.stringify(data)
         })
-            .then(async res => {
+            .then(async (res) => {
                 const response = await res.json()
                 setResponse(response)
                 return response
             })
             .catch(err => errorResponse(err))
     }
-    const updateDataOnDB = (newData, type, id) => {
-        const queryUrl = `${REACT_APP_API_URL}${(type === "movie" || type === "tv") ? "" : "/tv"}/${type}/${id}`
-
-        fetch(queryUrl, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(newData)
-        })
-            .then(response => response.json())
-            .then(response => setResponse(response))
-            .catch(err => console.error(err))
-    }
-    const getDBSerieElementByName = async (title) => {
+    // UPLOAD FUNCTION
+    const uploadFile = async (file, file_type, filename, id, model, imageType) => {
         setLoadingResponse(true)
+        
+        // Create new form data
+        const dataForm = new FormData()
 
-        return fetch(`${REACT_APP_API_URL}/tv/t/${title}`)
+        // Add the file to the form data
+        dataForm.append('file', file)
+
+        const urlQuery = file_type === 'video' ?
+            // Query Example: http://localhost:5000/upload/video/movie/name_of_the_movie-2023-movie/id_model
+            `${REACT_APP_API_URL}/upload/${file_type}/${searchType}/${filename}/${id}`
+            :
+            // Query Example: http://localhost:5000/upload/image/movie/name_of_the_movie-2023-movie/poster/a1b2c3d4e5f6g7h8i9/episode
+            `${REACT_APP_API_URL}/upload/${file_type}/${searchType}/${filename}/${imageType}/${id}/${model}`
+
+        await fetch(urlQuery, {
+            method: 'POST',
+            body: dataForm
+        })
             .then(async (res) => {
                 const response = await res.json()
                 setResponse(response)
+                return response
+            })
+            .catch(err => errorResponse(err))
+    }
+    // GET ID BY BANE FUNCTION
+    const getDBSerieElementByName = async (title) => {
+        return fetch(`${REACT_APP_API_URL}/tv/t/${title}`)
+            .then(async (res) => {
+                const response = await res.json()
+                if (response.resStatus === "error") {
+                    setResponse(response)
+                }
                 return response
             })
             .catch(err => errorResponse(err))
@@ -295,12 +242,13 @@ export default function UploadProvider({ children }) {
         return video_name.toLowerCase()
     }
     const clearData = () => {
+        // Data states
         setMovieE({})
         setSerieE({})
         setSeasonE({})
         setEpisodeE({})
         setDataForm(formInitialState)
-
+        // File states
         setVideoFile({})
         setPosterFile({})
         setBackdropFile({})

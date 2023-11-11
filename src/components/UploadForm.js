@@ -25,7 +25,7 @@ export default function UploadForm() {
             setDataForm({ ...dataForm, episode_number: "", episode_name: "", [name]: value === "" ? "" : value * 1 })
         }
         else if (name === "episode_number") {
-            setDataForm({ ...dataForm, episode_name: "", video_path: "", [name]: value * 1 })
+            setDataForm({ ...dataForm, episode_name: "Episodio " + value, video_path: "", [name]: value * 1 })
         }
         else {
             setDataForm({ ...dataForm, [name]: value })

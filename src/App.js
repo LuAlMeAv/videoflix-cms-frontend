@@ -1,12 +1,7 @@
-import UploadPage from "./pages/UploadPage";
+import MainRouter from "./router/MainRouter";
 
 function App() {
-  return (
-    <>
-      <h1>Upload File</h1>
-      <UploadPage />
-    </>
-  );
+  return <MainRouter />
 }
 
 export default App;

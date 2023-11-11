@@ -3,7 +3,7 @@ import { createContext, useState } from "react"
 export const authContext = createContext()
 
 const initialStateLogin = {
-    auth: true,
+    auth: false,
     level: 1000,
     token: "a1b2c3d4e5",
     id: "f6g7h8i9j0"
