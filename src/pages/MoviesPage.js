@@ -9,9 +9,9 @@ const getFormatedDate = (p) => {
     const date = new Date(p.value)
     const year = date.getFullYear()
     const month = date.getMonth() > 9 ? date.getMonth() : '0' + date.getMonth()
-    const day = date.getDay() > 9 ? date.getDay() : '0' + date.getDay()
+    const day = date.getDate() > 9 ? date.getDate() : '0' + date.getDate()
 
-    return year > 1000 ? `${day}/${month}/${year}` : '0/0/0'
+    return year > 1000 ? `${day}/${month}/${year}` : '00/00/00'
 }
 
 export default function AutoHeightOverlayNoSnap() {
@@ -52,7 +52,7 @@ export default function AutoHeightOverlayNoSnap() {
             sortable: false,
             renderCell: (p) => <img src={p.row.poster_path} alt={p.row.title} height='100%' />,
         },
-        { field: 'title', headerName: 'Título', width: 220, headerAlign: 'center' },
+        { field: 'title', headerName: 'Título', width: 250, headerAlign: 'center' },
         { field: 'views', headerName: 'Vistas', width: 90, headerAlign: 'center', align: 'center', },
         {
             field: 'createdAt',
@@ -70,8 +70,8 @@ export default function AutoHeightOverlayNoSnap() {
             align: 'center',
             valueGetter: getFormatedDate,
         },
-        { field: 'online', headerName: 'En linea', width: 50, headerAlign: 'center' },
-        { field: 'video_online', headerName: 'Video', width: 50, headerAlign: 'center' },
+        { field: 'online', headerName: 'En linea', width: 70, headerAlign: 'center' },
+        { field: 'video_online', headerName: 'Video', width: 70, headerAlign: 'center' },
         {
             field: 'action',
             headerName: 'Acciones',

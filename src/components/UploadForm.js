@@ -82,6 +82,12 @@ export default function UploadForm() {
         }
     }
 
+
+    useEffect(() => {
+        clearData()
+        // eslint-disable-next-line
+    }, [])
+
     return (
         <Grid container spacing={2} mt={3} maxWidth={"720px"} mx="auto" pr={3}>
             <InputItem xs={12} label="Titulo" name="title" value={title} onChange={handleInputChange} />
