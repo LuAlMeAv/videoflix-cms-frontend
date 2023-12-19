@@ -1,9 +1,12 @@
 import { useContext, useEffect, useState } from 'react';
 import { Box, Container, IconButton, styled } from '@mui/material';
 import { DataGrid, esES } from '@mui/x-data-grid';
-import { Delete, Edit } from '@mui/icons-material';
+import { Brightness1, Delete, Edit } from '@mui/icons-material';
 import { databaseContext } from '../contexts/DatabaseProvider';
-import DeleteDialog from '../components/DeleteDialog';
+import DeleteDialog2 from '../components/DeleteDialog';
+import { useNavigate } from 'react-router-dom';
+import { filesContext } from '../contexts/FilesProvider';
+import { globalContext } from '../contexts/GlobalProvider';
 
 const getFormatedDate = (p) => {
     const date = new Date(p.value)
@@ -16,29 +19,52 @@ const getFormatedDate = (p) => {
 
 export default function AutoHeightOverlayNoSnap() {
     const { getAllMovies, allMovies, deleteMovie } = useContext(databaseContext)
+    const { deleteFile } = useContext(filesContext)
+    const { setResponse } = useContext(globalContext)
 
     const [openDialog, setOpenDialog] = useState(false)
-    const [dialogData, setDialogData] = useState()
+    const [dialog, setDialog] = useState()
+
+    const navigate = useNavigate()
 
     const handleClickDelete = (data) => {
         setOpenDialog(true)
-        setDialogData({
-            id: data._id,
+
+        const handleDelete = async () => {
+            const fileID = data.video_path.split('/').reverse()[0]
+
+            const responseFile = await deleteFile(fileID)
+
+            if (responseFile?.resStatus === "error" && data.video_status === "success") {
+                return setResponse(responseFile)
+            }
+
+            const objectID = data._id
+
+            const responseDB = await deleteMovie(objectID)
+
+            setResponse(responseDB)
+        }
+
+        setDialog({
             title: "Desea eliminar la película?",
             content: "Estas seguro que quieres eliminar la película: " + data.title,
-            actionFunction: deleteMovie
+            actionFunction: handleDelete
         })
     }
 
     const renderButtonsAction = (p) => {
         return <>
-            <IconButton color='warning' onClick={() => console.log("Editar id: " + p.row._id)}>
+            <IconButton color='warning' onClick={() => navigate("/" + p.row._id)}>
                 <Edit />
             </IconButton>
             <IconButton color='error' onClick={() => handleClickDelete(p.row)}>
                 <Delete />
             </IconButton>
         </>
+    }
+    const renderVideoOnline = (e) => {
+        return <Brightness1 fontSize='small' color={e.row.video_status} />
     }
 
     const columns = [
@@ -71,7 +97,14 @@ export default function AutoHeightOverlayNoSnap() {
             valueGetter: getFormatedDate,
         },
         { field: 'online', headerName: 'En linea', width: 70, headerAlign: 'center' },
-        { field: 'video_online', headerName: 'Video', width: 70, headerAlign: 'center' },
+        {
+            field: 'video_status',
+            headerName: 'Video',
+            width: 70,
+            headerAlign: 'center',
+            align: "center",
+            renderCell: renderVideoOnline
+        },
         {
             field: 'action',
             headerName: 'Acciones',
@@ -87,10 +120,10 @@ export default function AutoHeightOverlayNoSnap() {
     useEffect(() => {
         getAllMovies()
         // eslint-disable-next-line
-    }, [dialogData])
+    }, [])
 
     return (
-        <Container>
+        <Container onLoad={() => getAllMovies()}>
             <DataGrid
                 autoHeight
                 rowSelection={false}
@@ -112,7 +145,7 @@ export default function AutoHeightOverlayNoSnap() {
                 }}
             />
             {openDialog &&
-                <DeleteDialog open={openDialog} setOpen={setOpenDialog} data={dialogData} setData={setDialogData} />
+                <DeleteDialog2 open={openDialog} setOpen={setOpenDialog} dialog={dialog} setDialog={setDialog} />
             }
         </Container>
     )

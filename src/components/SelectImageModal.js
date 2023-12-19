@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { Grid, Modal, Typography } from '@mui/material/';
-import { uploadContext } from '../contexts/UploadProvider';
+import { filesContext } from '../contexts/FilesProvider';
 
 const style = {
     position: 'absolute',
@@ -19,7 +19,7 @@ const style = {
 
 export default function SelectImageModal({ open, setOpen, images, type }) {
     const { REACT_APP_TMDB_URL_IMG_POSTER, REACT_APP_TMDB_URL_IMG_BACKDROP } = process.env
-    const { dataForm, setDataForm } = useContext(uploadContext)
+    const { dataForm, setDataForm } = useContext(filesContext)
 
     const urlPath = type === "poster" ? REACT_APP_TMDB_URL_IMG_POSTER : REACT_APP_TMDB_URL_IMG_BACKDROP
 

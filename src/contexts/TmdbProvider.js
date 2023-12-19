@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from "react"
-import { uploadContext } from "./UploadProvider";
+import { filesContext } from "./FilesProvider";
 import { enqueueSnackbar } from "notistack";
 
 export const tmdbContext = createContext();
@@ -15,7 +15,7 @@ const getCertificationValue = (response) => {
 
 export default function TmdbProvider({ children }) {
     const { REACT_APP_TMDB_URL_API, REACT_APP_TMDB_API_KEY } = process.env
-    const { searchType } = useContext(uploadContext)
+    const { searchType } = useContext(filesContext)
 
     const [searchList, setSearchList] = useState([])
 

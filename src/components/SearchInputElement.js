@@ -1,6 +1,6 @@
 import { useContext, useState } from 'react'
 import { Autocomplete, FormControl, Grid, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material'
-import { uploadContext } from '../contexts/UploadProvider'
+import { filesContext } from '../contexts/FilesProvider'
 import { tmdbContext } from '../contexts/TmdbProvider'
 
 const formInitialState = {
@@ -30,7 +30,7 @@ const formatRuntime = (runtime) => {
 
 export default function SearchInputElement() {
     const { getListOfSearchTMDB, setSearchList, getMoreSeasonImagesTMDB, getMoreEpisodeImagesTMDB, getSeasonEpisodesTMDB, getMoreImagesTMDB, getMoreInfoTMDB, getCertificationTMDB, searchList, getAlternativesTitlesTMDB } = useContext(tmdbContext)
-    const { setDataForm, clearData, searchType, setSearchType, setMovieE, serieE, setSerieE, seasonE, setSeasonE, setEpisodeE } = useContext(uploadContext)
+    const { setDataForm, clearData, searchType, setSearchType, setMovieE, serieE, setSerieE, seasonE, setSeasonE, setEpisodeE } = useContext(filesContext)
     const { REACT_APP_TMDB_URL_IMG_POSTER, REACT_APP_TMDB_URL_IMG_BACKDROP } = process.env
 
     const [epi, setEpi] = useState("")
@@ -249,7 +249,7 @@ export default function SearchInputElement() {
 
 const OptionElement = ({ props1, options }) => {
     const { REACT_APP_TMDB_URL_IMG_POSTER } = process.env
-    const { searchType } = useContext(uploadContext)
+    const { searchType } = useContext(filesContext)
 
     const date = searchType === "tv" ? options.first_air_date : options.release_date;
     const year = date?.split("-")[0]

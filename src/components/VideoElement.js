@@ -1,7 +1,8 @@
 import { forwardRef, useContext, useEffect, useRef, useState } from 'react'
 import { Button, Grid, IconButton, TextField, Tooltip, Typography } from '@mui/material'
 import { Cancel, CheckCircle, Delete } from '@mui/icons-material'
-import { uploadContext } from '../contexts/UploadProvider'
+import { filesContext } from '../contexts/FilesProvider'
+import DeleteDialog2 from './DeleteDialog'
 
 const formatRuntime = (runtime) => {
     const hours = Math.floor(runtime / 60)
@@ -11,10 +12,15 @@ const formatRuntime = (runtime) => {
     return `${hours > 0 ? hours + "h " : ""}${minutes > 0 ? minutesFormat + "m" : ""}`
 }
 
+const initialState = { data: {}, title: "", content: "", actionFunction: () => { } }
+
 export default function VideoElement({ videoState, setVideoState }) {
-    const { dataForm, setDataForm, setVideoFile, searchType } = useContext(uploadContext)
+    const { dataForm, setDataForm, setVideoFile, searchType, deleteFile } = useContext(filesContext)
 
     const { video_duration_formated, video_path, duration } = dataForm;
+
+    const [openDialog, setOpenDialog] = useState(false)
+    const [dialog, setDialog] = useState(initialState)
 
     const videoRef = useRef(null)
 
@@ -37,10 +43,24 @@ export default function VideoElement({ videoState, setVideoState }) {
         setDataForm({ ...dataForm, video_duration, video_duration_formated, video_end: video_duration })
     }
     const handleDeleteVideoFile = () => {
-        setVideoState('play')
+        setOpenDialog(true)
 
-        setDataForm({ ...dataForm, video_path: "", video_start: 0, video_end: 0, video_start_intro: 0, video_end_intro: 0 })
-        setVideoFile({})
+        const handleDelete = async () => {
+            const fileID = dataForm.video_path.split('/').reverse()[0]
+
+            const response = await deleteFile(fileID)
+
+            if (response.resStatus === "success") {
+                setDataForm({ ...dataForm, video_path: "", video_start: 0, video_end: 0, video_start_intro: 0, video_end_intro: 0 })
+                setVideoFile({})
+            }
+        }
+
+        setDialog({
+            title: "Desea eliminar el video?",
+            content: "Estas seguro que quieres eliminar el video perteneciente a: " + dataForm.title,
+            actionFunction: handleDelete
+        })
     }
 
     useEffect(() => {
@@ -92,12 +112,16 @@ export default function VideoElement({ videoState, setVideoState }) {
                     <TextField fullWidth type='file' inputProps={{ accept: "video/*" }} onChange={handleOnSelectVideo} />
                 }
             </Grid>
+
+            {openDialog &&
+                <DeleteDialog2 open={openDialog} setOpen={setOpenDialog} dialog={dialog} setDialog={setDialog} />
+            }
         </Grid>
     )
 }
 
 const TimeModule = forwardRef(function ({ type }, ref) {
-    const { dataForm, setDataForm } = useContext(uploadContext)
+    const { dataForm, setDataForm } = useContext(filesContext)
 
     const [videoForm, setVideoForm] = useState({ start: 0, end: 0, start_intro: 0, end_intro: 0 })
 

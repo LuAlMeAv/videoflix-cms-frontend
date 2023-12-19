@@ -1,6 +1,6 @@
 import { createContext } from "react"
 import TmdbProvider from "./TmdbProvider"
-import UploadProvider from "./UploadProvider"
+import FilesProvider from "./FilesProvider"
 import AuthProvider from "./AuthProvider"
 import { SnackbarProvider, enqueueSnackbar } from "notistack"
 import DatabaseProvider from "./DatabaseProvider"
@@ -21,11 +21,11 @@ export default function GlobalProvider({ children }) {
             <SnackbarProvider>
                 <AuthProvider>
                     <DatabaseProvider>
-                        <UploadProvider>
+                        <FilesProvider>
                             <TmdbProvider>
                                 {children}
                             </TmdbProvider>
-                        </UploadProvider>
+                        </FilesProvider>
                     </DatabaseProvider>
                 </AuthProvider>
             </SnackbarProvider>

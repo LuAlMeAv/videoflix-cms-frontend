@@ -1,18 +1,21 @@
 import { useContext, useEffect, useState } from 'react'
 import { Autocomplete, Backdrop, Button, CircularProgress, Grid, TextField } from '@mui/material'
 import { useSnackbar } from 'notistack'
-import { uploadContext } from '../contexts/UploadProvider'
+import { filesContext } from '../contexts/FilesProvider'
 import ImagesElement from './ImagesElement'
 import VideoElement from './VideoElement'
+import { useParams } from 'react-router-dom'
 
 export default function UploadForm() {
-    const { dataForm, setDataForm, clearData, saveMovie, saveSerie, saveSeason, saveEpisode, searchType, serieE, seasonE, episodeE, loadingResponse } = useContext(uploadContext)
+    const { dataForm, setDataForm, clearData, saveMovie, saveSerie, saveSeason, saveEpisode, searchType, serieE, seasonE, episodeE, loadingResponse, getDataFromBackend, updateMovieData } = useContext(filesContext)
 
     const { title, original_title, tagline, season_number, episode_number, episode_name, year, certification, duration, genre_ids, overview } = dataForm;
 
     const [videoState, setVideoState] = useState('play')
 
     const { enqueueSnackbar } = useSnackbar();
+
+    const { id } = useParams()
 
     const handleInputChange = (e) => {
         const name = e.target.name
@@ -81,12 +84,19 @@ export default function UploadForm() {
             saveEpisode()
         }
     }
+    const handleClickSaveChanges = (id) => {
+        updateMovieData(id)
+    }
 
 
     useEffect(() => {
         clearData()
+
+        if (id) {
+            getDataFromBackend(id)
+        }
         // eslint-disable-next-line
-    }, [])
+    }, [id])
 
     return (
         <Grid container spacing={2} mt={3} maxWidth={"720px"} mx="auto" pr={3}>
@@ -150,15 +160,21 @@ export default function UploadForm() {
             }
 
             {/* BUTTON AREA */}
-            <Grid item xs={12} md={8} container spacing={2} mx="auto">
-                <ButtonItem onClick={clearData} variant='outlined' children="Limpiar" />
+            <Grid item xs={12} md={8} container spacing={2} mx="auto" justifyContent="center" >
+                {id ?
+                    <ButtonItem onClick={() => handleClickSaveChanges(id)} variant="contained" children="Actualizar" />
+                    :
+                    <>
+                        <ButtonItem onClick={clearData} variant='outlined' children="Limpiar" />
 
-                <ButtonItem onClick={handleClickSave} variant='contained' children={
-                    searchType === "movie" ? "Guardar Pelicula" :
-                        season_number === "" ? "Guardar Serie" :
-                            episode_number === "" ? "Guardar Temporada" :
-                                "Guardar Episodio"
-                } />
+                        <ButtonItem onClick={handleClickSave} variant='contained' children={
+                            searchType === "movie" ? "Guardar Pelicula" :
+                                season_number === "" ? "Guardar Serie" :
+                                    episode_number === "" ? "Guardar Temporada" :
+                                        "Guardar Episodio"
+                        } />
+                    </>
+                }
             </Grid>
             {/* LOADING BACKDROP */}
             {loadingResponse &&
@@ -173,7 +189,7 @@ export default function UploadForm() {
 }
 
 function InputItem(props) {
-    const { dataForm, setDataForm } = useContext(uploadContext)
+    const { dataForm, setDataForm } = useContext(filesContext)
 
     const handleOnBlur = (e) => {
         const name = e.target.name
@@ -203,7 +219,7 @@ function ButtonItem(props) {
 
 // GENERES INPUT CHECKBOX
 function GeneresSelectorInput({ value, setGenres }) {
-    const { searchType } = useContext(uploadContext)
+    const { searchType } = useContext(filesContext)
 
     const [genresValue, setGenresValue] = useState([])
 

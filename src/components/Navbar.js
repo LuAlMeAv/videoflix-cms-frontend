@@ -7,6 +7,8 @@ export default function Navbar() {
             &nbsp;
             <Link to='/movies' style={{padding: "5px"}}>Movies</Link>
             &nbsp;
+            {/* <Link to='/304838203' style={{padding: "5px"}}>ID</Link>
+            &nbsp; */}
         </div>
     )
 }

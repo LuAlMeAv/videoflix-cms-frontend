@@ -1,7 +1,7 @@
 import { createContext, useState } from "react"
 import { useSnackbar } from "notistack"
 
-export const uploadContext = createContext()
+export const filesContext = createContext()
 
 const formInitialState = {
     title: "",
@@ -29,7 +29,7 @@ const formInitialState = {
     video_end_intro: 0
 }
 
-export default function UploadProvider({ children }) {
+export default function FilesProvider({ children }) {
     const { REACT_APP_API_URL } = process.env
 
     const { enqueueSnackbar } = useSnackbar();
@@ -172,10 +172,23 @@ export default function UploadProvider({ children }) {
             })
             .catch(err => errorResponse(err))
     }
+    // UPDATE FUNTIONS
+    const updateMovieData = async (id) => {
+        fetch(`${REACT_APP_API_URL}/movie/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dataForm)
+        })
+            .then(response => response.json())
+            .then(response => setResponse(response))
+            .catch(err => errorResponse(err))
+    }
     // UPLOAD FUNCTION
     const uploadFile = async (file, file_type, filename, id, model, imageType) => {
         setLoadingResponse(true)
-        
+
         // Create new form data
         const dataForm = new FormData()
 
@@ -212,6 +225,23 @@ export default function UploadProvider({ children }) {
             })
             .catch(err => errorResponse(err))
     }
+    // Get info from the backend too update data
+    const getDataFromBackend = (id) => {
+        fetch(`${REACT_APP_API_URL}/movie/${id}`)
+            .then(response => response.json())
+            .then(response => setDataForm(response._r))
+            .catch(err => errorResponse(err))
+    }
+
+    const deleteFile = async (id) => {
+        return await fetch(`${REACT_APP_API_URL}/file/${id}`, {
+            method: 'DELETE'
+        })
+            .then(async (res) => { return await res.json() })
+            .catch(err => console.error(err))
+    }
+
+
     // BANCKEND RESPONSES FUNCTIONS
     const setResponse = (response) => {
         setLoadingResponse(false)
@@ -255,7 +285,7 @@ export default function UploadProvider({ children }) {
     }
 
     return (
-        <uploadContext.Provider
+        <filesContext.Provider
             value={{
                 dataForm, setDataForm,
                 searchType, setSearchType,
@@ -271,13 +301,20 @@ export default function UploadProvider({ children }) {
                 setVideoFile,
                 setPosterFile,
                 setBackdropFile,
+
                 saveMovie,
                 saveSerie,
                 saveSeason,
                 saveEpisode,
+
+                updateMovieData,
+
+                getDataFromBackend,
+
+                deleteFile,
             }}
         >
             {children}
-        </uploadContext.Provider>
+        </filesContext.Provider>
     )
 }

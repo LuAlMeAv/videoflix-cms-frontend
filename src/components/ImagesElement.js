@@ -2,11 +2,11 @@ import { useContext, useState } from 'react'
 import { Button, Grid, IconButton, TextField, Typography } from '@mui/material'
 import { Delete } from '@mui/icons-material'
 import { enqueueSnackbar } from 'notistack'
-import { uploadContext } from '../contexts/UploadProvider'
+import { filesContext } from '../contexts/FilesProvider'
 import SelectImageModal from './SelectImageModal'
 
 export default function ImagesElement() {
-  const { dataForm, setDataForm, searchType, movieE, serieE, seasonE, episodeE, setPosterFile, setBackdropFile } = useContext(uploadContext)
+  const { dataForm, setDataForm, searchType, movieE, serieE, seasonE, episodeE, setPosterFile, setBackdropFile } = useContext(filesContext)
 
   const [openModal, setOpenModal] = useState(false)
   const [images, setImages] = useState([])
