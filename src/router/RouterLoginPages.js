@@ -10,7 +10,7 @@ export default function RouterLoginPages() {
             <Navbar />
             <Routes>
                 <Route path="/" element={<UploadPage />} />
-                <Route path="/:id" element={<UploadPage />} />
+                <Route path="/:edit_element_type/:id" element={<UploadPage />} />
                 <Route path="/movies" element={<MoviesPage />} />
 
 

@@ -1,133 +1,131 @@
 import { useContext, useState } from 'react'
+import { enqueueSnackbar } from 'notistack'
 import { Button, Grid, IconButton, TextField, Typography } from '@mui/material'
 import { Delete } from '@mui/icons-material'
-import { enqueueSnackbar } from 'notistack'
+import { databaseContext } from '../contexts/DatabaseProvider'
 import { filesContext } from '../contexts/FilesProvider'
 import SelectImageModal from './SelectImageModal'
+import DeleteDialog from './DeleteDialog'
 
 export default function ImagesElement() {
-  const { dataForm, setDataForm, searchType, movieE, serieE, seasonE, episodeE, setPosterFile, setBackdropFile } = useContext(filesContext)
-
-  const [openModal, setOpenModal] = useState(false)
-  const [images, setImages] = useState([])
-  const [imagesType, setImagesType] = useState("")
-
-  const { episode_number, season_number, poster_path, title, backdrop_path, } = dataForm
-
-  const handleClickToChangeImage = (e) => {
-    const type = e.target.attributes.name?.value || ""
-
-    if (type === "") {
-      return
-    }
-
-    setImagesType(type)
-
-    let imgs;
-
-    if (searchType === "movie") {
-      imgs = type === "poster" ? movieE.images?.posters : movieE.images?.backdrops
-    } else if (episodeE.episode_number) {
-      imgs = episodeE.images.backdrops
-    } else if (seasonE.season_number) {
-      imgs = seasonE.images.posters
-    } else if (searchType === "tv") {
-      imgs = type === "poster" ? serieE.images?.posters : serieE.images?.backdrops
-    } else {
-      imgs = []
-    }
-    setImages(imgs)
-
-    if (imgs?.length > 1) {
-      setOpenModal(true)
-    } else {
-      enqueueSnackbar('No hay mas imágenes para mostrar', { variant: "warning" })
-    }
-  }
-  const handleSelectFileToImage = (e, value) => {
-    const file = e.target.files[0]
-
-    const srcPath = window.URL.createObjectURL(file)
-
-    setImages([])
-
-    if (value === "poster") {
-      setDataForm({ ...dataForm, poster_path: srcPath })
-      setPosterFile(file)
-    } else {
-      setDataForm({ ...dataForm, backdrop_path: srcPath })
-      setBackdropFile(file)
-    }
-  }
-  const handleRemoveImage = (type) => {
-    if (type === "poster") {
-      setDataForm({ ...dataForm, poster_path: "" })
-      setPosterFile({})
-    } else {
-      setDataForm({ ...dataForm, backdrop_path: "" })
-      setBackdropFile({})
-    }
-  }
+  const { elementType } = useContext(databaseContext)
 
   return (
     <Grid container item xs={12} spacing={2}>
-      {/* POSTER IMAGE */}
-      {(searchType === "movie" || episode_number === "" || (episode_number === "" && season_number === "")) &&
-        <Grid item xs={9} md={4} mx="auto" position="relative" >
-          <Typography align='center' variant="h5">Poster</Typography>
-          {poster_path ?
-            <>
-              {poster_path &&
-                <IconButton onClick={() => handleRemoveImage("poster")} sx={{ position: 'absolute', right: 0 }} color='error' ><Delete /></IconButton>
-              }
-              <img
-                width="100%"
-                src={poster_path}
-                alt={title + ' poster'}
-                name="poster"
-                onClick={handleClickToChangeImage}
-              />
-            </>
-            :
-            <>
-              {images?.length > 0 &&
-                <Button variant='text' name="poster" onClick={handleClickToChangeImage}>Más imágenes</Button>
-              }
-              <TextField fullWidth type='file' inputProps={{ accept: "image/*" }} onChange={(e) => handleSelectFileToImage(e, "poster")} />
-            </>
-          }
-        </Grid>
+      {elementType !== 'episode' &&
+        <Image type='poster' />
       }
-      {/* BACKDROP IMAGE */}
-      {(searchType === "movie" || episode_number !== "" || (episode_number === "" && season_number === "")) &&
-        <Grid item xs={12} md={8} mx="auto" position="relative">
-          <Typography align='center' variant="h5">Fondo</Typography>
-          {backdrop_path ?
-            <>
-              {backdrop_path &&
-                <IconButton onClick={() => handleRemoveImage('backdrop')} sx={{ position: 'absolute', right: 0 }} color='error' ><Delete /></IconButton>
-              }
-              <img
-                width="100%"
-                name="backdrop"
-                src={backdrop_path}
-                alt={title + ' backdrop'}
-                onClick={handleClickToChangeImage}
-              />
-            </>
-            :
-            <>
-              {images.length > 0 &&
-                <Button variant='text' name="backdrop" onClick={handleClickToChangeImage}>Más imágenes</Button>
-              }
-              <TextField fullWidth type='file' inputProps={{ accept: "image/*" }} onChange={(e) => handleSelectFileToImage(e, "backdrop")} />
-            </>
-          }
-        </Grid>
+      {elementType !== 'season' &&
+        <Image type='backdrop' />
       }
-      {/* MODAL TO SELECT IMAGE */}
-      {openModal && images?.length > 1 &&
-        <SelectImageModal open={openModal} setOpen={setOpenModal} images={images} type={imagesType} />
+    </Grid >
+  )
+}
+
+const Image = ({ type }) => {
+  const { REACT_APP_API_URL } = process.env
+  const { setPosterFile, setBackdropFile, deleteSingleFile } = useContext(filesContext)
+  const { dataForm, setDataForm, updateData } = useContext(databaseContext)
+
+  const [openModal, setOpenModal] = useState(false)
+  const [openDialog, setOpenDialog] = useState(false)
+  const [dialog, setDialog] = useState({})
+  const [images, setImages] = useState([])
+
+  const image_path = dataForm[type + '_path']
+  const setFile = {
+    'backdrop': setBackdropFile,
+    'poster': setPosterFile,
+  }
+
+  const handleSelectFileImage = (e) => {
+    const file = e.target.files[0]
+    const newPath = window.URL.createObjectURL(file)
+
+    setFile[type](file)
+    setDataForm({ ...dataForm, [type + '_path']: newPath })
+  }
+
+  const handleRemoveImage = () => {
+    if (image_path.includes('blob:')) {
+      window.URL.revokeObjectURL(image_path)
+      setDataForm({ ...dataForm, [type + '_path']: '' })
+      setFile[type]({})
+      return
+    }
+
+    const external_path = image_path.includes('http')
+
+    const handleDelete = async () => {
+      if (!external_path) {
+        const responseFile = await deleteSingleFile(image_path)
+
+        if (responseFile.resStatus === 'error') {
+          return
+        }
+      }
+
+      const response = await updateData({ [type + '_path']: '' })
+
+      if (response.resStatus === 'success') {
+        setDataForm({ ...dataForm, [type + '_path']: '' })
+        enqueueSnackbar('El ' + type + ' fue eliminado', { variant: 'success' })
+      }
+    }
+
+    setOpenDialog(true)
+
+    setDialog({
+      ...dialog,
+      title: "Desea eliminar la imagen?",
+      content: `El ${type} de: ${dataForm.title} sera eliminado${external_path ? '' : ', así como el archivo en el sistema'}`,
+      actionFunction: handleDelete
+    })
+  }
+
+  const handleMoreImages = () => {
+    if (!dataForm.images || dataForm.images[type + 's'].length <= 1) {
+      return enqueueSnackbar('No hay más imágenes para mostrar', { variant: 'warning' })
+    }
+    setOpenModal(true)
+    setImages(dataForm.images[type + 's'])
+  }
+
+  return (
+    <Grid item xs={type === 'poster' ? 9 : 12} md={type === 'poster' ? 4 : 8} mx="auto" position="relative" textAlign='center' >
+      <Typography align='center' variant="h6">{type === 'poster' ? 'Poster' : 'Fondo'}</Typography>
+      {image_path ?
+        <>
+          <IconButton
+            color='error'
+            onClick={handleRemoveImage}
+            sx={{ position: 'absolute', right: 0 }}
+            children={<Delete />}
+          />
+
+          <img
+            width="100%"
+            style={{ cursor: 'pointer' }}
+            src={image_path.includes('http') ? image_path : `${REACT_APP_API_URL}/file/` + image_path}
+            alt={dataForm.title}
+            onClick={handleMoreImages}
+          />
+        </>
+        :
+        <>
+          {(dataForm.images && dataForm.images[type + 's'].length > 1) &&
+            <Button variant='outlined' size='small' sx={{ mb: 1 }} name="poster" onClick={handleMoreImages}>Más imágenes</Button>
+          }
+          <TextField fullWidth type='file' inputProps={{ accept: "image/*" }} onChange={handleSelectFileImage} />
+        </>
+      }
+
+      {openModal &&
+        <SelectImageModal open={openModal} setOpen={setOpenModal} images={images} type={type} />
+      }
+
+      {openDialog &&
+        <DeleteDialog open={openDialog} setOpen={setOpenDialog} dialog={dialog} setDialog={setDialog} />
       }
     </Grid >
   )

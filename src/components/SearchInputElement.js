@@ -2,23 +2,7 @@ import { useContext, useState } from 'react'
 import { Autocomplete, FormControl, Grid, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material'
 import { filesContext } from '../contexts/FilesProvider'
 import { tmdbContext } from '../contexts/TmdbProvider'
-
-const formInitialState = {
-    title: "",
-    original_title: "",
-    tagline: "",
-    episode_name: "",
-    episode_number: "",
-    season_number: "",
-    year: "",
-    certification: "",
-    genres: "",
-    genre_ids: "",
-    overview: "",
-    backdrop_path: "",
-    poster_path: "",
-    video_path: ""
-}
+import { databaseContext } from '../contexts/DatabaseProvider'
 
 const formatRuntime = (runtime) => {
     const hours = Math.floor(runtime / 60)
@@ -29,24 +13,23 @@ const formatRuntime = (runtime) => {
 }
 
 export default function SearchInputElement() {
-    const { getListOfSearchTMDB, setSearchList, getMoreSeasonImagesTMDB, getMoreEpisodeImagesTMDB, getSeasonEpisodesTMDB, getMoreImagesTMDB, getMoreInfoTMDB, getCertificationTMDB, searchList, getAlternativesTitlesTMDB } = useContext(tmdbContext)
-    const { setDataForm, clearData, searchType, setSearchType, setMovieE, serieE, setSerieE, seasonE, setSeasonE, setEpisodeE } = useContext(filesContext)
     const { REACT_APP_TMDB_URL_IMG_POSTER, REACT_APP_TMDB_URL_IMG_BACKDROP } = process.env
+    const { getListOfSearchTMDB, setSearchList, getMoreSeasonImagesTMDB, getMoreEpisodeImagesTMDB, getSeasonEpisodesTMDB, getMoreImagesTMDB, getMoreInfoTMDB, getCertificationTMDB, searchList, getAlternativesTitlesTMDB } = useContext(tmdbContext)
+    const { clearData, setDataForm, dataForm, searchType, setSearchType, setElementType } = useContext(databaseContext)
+    const { clearFiles } = useContext(filesContext)
 
-    const [epi, setEpi] = useState("")
-    const [sea, setSea] = useState("")
+    const [season, setSeason] = useState("")
+    const [episode, setEpisode] = useState("")
 
     // HANDLE CHANGE FUNCTIONS
     const handleChangeTypeOfSearch = (e) => {
-        clearData()
-        setEpi("")
-        setSea("")
-        setSearchType(e.target.value)
+        const value = e.target.value
+        handleClear()
+        setSearchType(value)
+        setElementType(value === 'tv' ? 'serie' : value)
     }
     const handleInputChange = (e) => {
-        clearData()
-        setEpi("")
-        setSea("")
+        handleClear()
 
         const query = e.target.value
 
@@ -63,9 +46,7 @@ export default function SearchInputElement() {
             return
         }
 
-        clearData()
-        setEpi("")
-        setSea("")
+        handleClear()
 
         const images = await getMoreImagesTMDB(value.id)
         const alternative_titles = await getAlternativesTitlesTMDB(value.id)
@@ -76,104 +57,93 @@ export default function SearchInputElement() {
             const duration = formatRuntime(moreInfo.runtime)
             const certification = await getCertificationTMDB(value.id)
 
-            const { title, original_title, genre_ids, overview, backdrop_path, poster_path } = value
-
+            setElementType('movie')
             setDataForm({
-                ...formInitialState,
-                title,
-                original_title,
-                tagline: moreInfo.tagline,
+                ...dataForm,
+                ...value,
+                ...moreInfo,
                 year,
-                certification,
+                images,
                 duration,
-                genres: moreInfo.genres,
-                genre_ids,
-                overview,
-                backdrop_path: REACT_APP_TMDB_URL_IMG_BACKDROP + backdrop_path,
-                poster_path: REACT_APP_TMDB_URL_IMG_POSTER + poster_path
+                certification,
+                tmdb_id: value.id,
+                alternative_titles,
+                poster_path: REACT_APP_TMDB_URL_IMG_POSTER + value.poster_path,
+                backdrop_path: REACT_APP_TMDB_URL_IMG_BACKDROP + value.backdrop_path,
             })
-            setMovieE({ ...value, ...moreInfo, images, alternative_titles })
         } else {
             const year = value.first_air_date.split("-")[0]
             const moreInfo = await getMoreInfoTMDB(value.id)
             const certification = await getCertificationTMDB(value.id)
 
-            const { title, original_title, genre_ids, overview, backdrop_path, poster_path } = value;
-
+            setElementType('serie')
             setDataForm({
-                ...formInitialState,
-                title,
-                original_title,
-                tagline: moreInfo.tagline,
+                ...dataForm,
+                ...value,
+                ...moreInfo,
                 year,
+                images,
                 certification,
-                genres: moreInfo.genres,
-                genre_ids,
-                overview,
-                backdrop_path: REACT_APP_TMDB_URL_IMG_BACKDROP + backdrop_path,
-                poster_path: REACT_APP_TMDB_URL_IMG_POSTER + poster_path
+                tmdb_id: value.id,
+                alternative_titles,
+                poster_path: REACT_APP_TMDB_URL_IMG_POSTER + value.poster_path,
+                backdrop_path: REACT_APP_TMDB_URL_IMG_BACKDROP + value.backdrop_path,
             })
-            setSerieE({ ...value, ...moreInfo, images, certification, alternative_titles })
         }
     }
     const handleChangeSeason = async (e) => {
-        setSeasonE({})
-        setEpisodeE({})
-        setEpi("")
+        setEpisode("")
 
         const value = e.target.value
-        setSea(value)
+        value.tmdb_id_serie = dataForm.tmdb_id
+
+        setSeason(value)
 
         const year = value.air_date.split("-")[0]
-        const images = await getMoreSeasonImagesTMDB(serieE.id, value.season_number)
-        const episodes = await getSeasonEpisodesTMDB(serieE.id, value.season_number)
+        const images = await getMoreSeasonImagesTMDB(value.tmdb_id_serie, value.season_number)
+        const episodes = await getSeasonEpisodesTMDB(value.tmdb_id_serie, value.season_number)
 
-        const { season_number, overview, poster_path } = value;
-
+        setElementType('season')
         setDataForm({
-            ...formInitialState,
-            title: serieE.title,
-            original_title: serieE.original_title,
-            tagline: serieE.tagline,
-            season_number,
+            ...dataForm,
+            ...value,
+            episodes: episodes.episodes,
+            images,
             year,
-            certification: serieE.certification,
-            genres: serieE.genres,
-            genre_ids: serieE.genre_ids,
-            overview,
-            poster_path: REACT_APP_TMDB_URL_IMG_POSTER + poster_path,
+            poster_path: REACT_APP_TMDB_URL_IMG_POSTER + value.poster_path,
+            episode_number: "",
+            duration: ""
         })
-        setSeasonE({ ...value, images, episodes: episodes.episodes })
     }
     const handleChangeEpisode = async (e) => {
-        setEpisodeE({})
-
         const value = e.target.value
-        setEpi(value)
+
+        setEpisode(value)
 
         const year = value.air_date?.split("-")[0]
-        const images = await getMoreEpisodeImagesTMDB(serieE.id, value.season_number, value.episode_number)
+        const images = await getMoreEpisodeImagesTMDB(season.tmdb_id_serie, value.season_number, value.episode_number)
         const duration = formatRuntime(value.runtime)
 
-        const { name, episode_number, season_number, overview, still_path } = value
+        images.backdrops = images.stills
+        delete images.stills
 
+        setElementType('episode')
         setDataForm({
-            ...formInitialState,
-            title: serieE.title,
-            original_title: serieE.original_title,
-            tagline: serieE.tagline,
-            episode_name: name,
-            episode_number,
-            season_number,
+            ...dataForm,
+            ...value,
             year,
-            certification: serieE.certification,
+            images,
             duration,
-            genres: serieE.genres,
-            genre_ids: serieE.genre_ids,
-            overview,
-            backdrop_path: REACT_APP_TMDB_URL_IMG_BACKDROP + still_path
+            episode_name: value.name,
+            backdrop_path: REACT_APP_TMDB_URL_IMG_BACKDROP + value.still_path
         })
-        setEpisodeE({ ...value, images: { backdrops: images.stills } })
+    }
+
+    const handleClear = () => {
+        clearFiles()
+        clearData()
+        setSeason("")
+        setEpisode("")
     }
 
     return (
@@ -205,18 +175,18 @@ export default function SearchInputElement() {
                 />
             </Grid>
 
-            {serieE.seasons?.length > 0 &&
+            {dataForm.seasons?.length > 0 &&
                 <Grid item xs={7}>
                     <FormControl fullWidth>
                         <InputLabel id='season'>Temporada</InputLabel>
                         <Select
                             label="Temporada"
                             labelId='season'
-                            value={sea}
+                            value={season}
                             onChange={handleChangeSeason}
                         >
                             {
-                                serieE.seasons?.map(se => {
+                                dataForm.seasons?.map(se => {
                                     return <MenuItem key={se.id} value={se} >{se.name}</MenuItem>
                                 })
                             }
@@ -224,18 +194,18 @@ export default function SearchInputElement() {
                     </FormControl>
                 </Grid>
             }
-            {seasonE.episodes?.length > 0 &&
+            {dataForm.episodes?.length > 0 &&
                 <Grid item xs={5}>
                     <FormControl fullWidth>
                         <InputLabel id='episode'>Episodio</InputLabel>
                         <Select
                             label="Episodio"
                             labelId='episode'
-                            value={epi}
+                            value={episode}
                             onChange={handleChangeEpisode}
                         >
                             {
-                                seasonE.episodes?.map(ep => {
+                                dataForm.episodes?.map(ep => {
                                     return <MenuItem key={ep.id} value={ep} >{ep.episode_number}</MenuItem>
                                 })
                             }

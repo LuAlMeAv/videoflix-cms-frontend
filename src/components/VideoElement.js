@@ -2,7 +2,9 @@ import { forwardRef, useContext, useEffect, useRef, useState } from 'react'
 import { Button, Grid, IconButton, TextField, Tooltip, Typography } from '@mui/material'
 import { Cancel, CheckCircle, Delete } from '@mui/icons-material'
 import { filesContext } from '../contexts/FilesProvider'
-import DeleteDialog2 from './DeleteDialog'
+import DeleteDialog from './DeleteDialog'
+import { databaseContext } from '../contexts/DatabaseProvider'
+import { enqueueSnackbar } from 'notistack'
 
 const formatRuntime = (runtime) => {
     const hours = Math.floor(runtime / 60)
@@ -12,26 +14,27 @@ const formatRuntime = (runtime) => {
     return `${hours > 0 ? hours + "h " : ""}${minutes > 0 ? minutesFormat + "m" : ""}`
 }
 
-const initialState = { data: {}, title: "", content: "", actionFunction: () => { } }
+// const dialogInitialState = { data: {}, title: "", content: "", actionFunction: () => { } }
+const videoInitialState = { video_path: '', video_start: '', video_end: '', video_start_intro: '', video_end_intro: '' }
 
 export default function VideoElement({ videoState, setVideoState }) {
-    const { dataForm, setDataForm, setVideoFile, searchType, deleteFile } = useContext(filesContext)
+    const { REACT_APP_API_URL } = process.env
+    const { setVideoFile, deleteSingleFile } = useContext(filesContext)
+    const { dataForm, setDataForm, searchType, updateData } = useContext(databaseContext)
 
     const { video_duration_formated, video_path, duration } = dataForm;
 
     const [openDialog, setOpenDialog] = useState(false)
-    const [dialog, setDialog] = useState(initialState)
+    const [dialog, setDialog] = useState({})
 
     const videoRef = useRef(null)
 
     const handleOnSelectVideo = (e) => {
-        setVideoState('play')
-
         const file = e.target.files[0]
 
         const srcPath = window.URL.createObjectURL(file)
 
-        setDataForm({ ...dataForm, video_path: srcPath })
+        setDataForm({ ...dataForm, ...videoInitialState, video_path: srcPath })
         setVideoFile(file)
     }
     const handleOnLoadVideo = (e) => {
@@ -39,28 +42,52 @@ export default function VideoElement({ videoState, setVideoState }) {
 
         const video_duration = video.duration
         const video_duration_formated = formatRuntime(video_duration / 60)
+        const video_end = dataForm.video_end > 0 ? dataForm.video_end : video_duration
 
-        setDataForm({ ...dataForm, video_duration, video_duration_formated, video_end: video_duration })
+        setDataForm({
+            ...dataForm,
+            video_duration,
+            video_duration_formated,
+            video_end
+        })
     }
     const handleDeleteVideoFile = () => {
+        const { video_path } = dataForm
+
+        // If you want delete before upload file
+        if (video_path.includes('blob:')) {
+            window.URL.revokeObjectURL(dataForm.video_path)
+            setDataForm({ ...dataForm, ...videoInitialState })
+            setVideoFile({})
+            return
+        }
+
+        // Delete file from the backend system
         setOpenDialog(true)
 
         const handleDelete = async () => {
-            const fileID = dataForm.video_path.split('/').reverse()[0]
+            const responseFile = await deleteSingleFile(dataForm.video_path)
 
-            const response = await deleteFile(fileID)
+            if (responseFile.resStatus === "success") {
+                const response = await updateData(videoInitialState)
 
-            if (response.resStatus === "success") {
-                setDataForm({ ...dataForm, video_path: "", video_start: 0, video_end: 0, video_start_intro: 0, video_end_intro: 0 })
-                setVideoFile({})
+                if (response.resStatus === 'success') {
+                    setDataForm({ ...dataForm, ...videoInitialState })
+                    setVideoFile({})
+                    enqueueSnackbar('El video fue eliminado', { variant: 'success' })
+                }
             }
         }
 
-        setDialog({
+        return setDialog({
             title: "Desea eliminar el video?",
-            content: "Estas seguro que quieres eliminar el video perteneciente a: " + dataForm.title,
+            content: "El video de: " + dataForm.title + " sera eliminado del sistema también",
             actionFunction: handleDelete
         })
+    }
+    const handleVideoError = (e) => {
+        setVideoFile({})
+        setDataForm({ ...dataForm, video_path: '' })
     }
 
     useEffect(() => {
@@ -77,23 +104,28 @@ export default function VideoElement({ videoState, setVideoState }) {
                 xs={12}
                 children={<Typography align='center' variant="h5" children="Video" />}
             />
+
             <Grid item xs={12} position="relative">
                 {video_path ?
                     <Grid item container>
                         <Grid item xs={12}>
-                            <IconButton color='error' sx={{ position: "absolute", right: 0, zIndex: "99" }} onClick={handleDeleteVideoFile}><Delete fontSize="large" /></IconButton>
+                            <IconButton color='error' sx={{ position: "absolute", right: 0, zIndex: "5" }} onClick={handleDeleteVideoFile}><Delete fontSize="large" /></IconButton>
                             <video
                                 controls
                                 width="100%"
-                                src={video_path}
+                                src={video_path?.includes('http') ? video_path : `${REACT_APP_API_URL}/file/` + video_path}
                                 ref={videoRef}
                                 onLoadedData={handleOnLoadVideo}
+                                onError={handleVideoError}
+                                onPlay={() => setVideoState('play')}
                             />
                         </Grid>
+
                         <Grid item xs={12}>
                             <Typography width="auto" display="flex">
                                 Duración real: {video_duration_formated}
-                                <Tooltip title={duration !== video_duration_formated && "La duració del video no es igual a la del formulario"} placement='top' arrow>
+                                &nbsp;
+                                <Tooltip title={duration !== video_duration_formated && "La duración del video no es igual a la del formulario"} placement='top' arrow>
                                     {duration === video_duration_formated ?
                                         <CheckCircle color='success' /> :
                                         <Cancel color='error' />}
@@ -101,93 +133,84 @@ export default function VideoElement({ videoState, setVideoState }) {
                             </Typography>
                         </Grid>
 
-                        <TimeModule ref={videoRef} />
+                        <TimeForm ref={videoRef} />
 
-                        {searchType === "tv" && <>
-                            <Grid item xs={12} mt={1} children={<Typography variant='h6' children="Intro" />} />
-                            <TimeModule ref={videoRef} type="intro" />
-                        </>}
+                        {searchType === "tv" &&
+                            <>
+                                <Grid item xs={12} mt={1} children={<Typography variant='h6' children="Intro" />} />
+                                <TimeForm ref={videoRef} intro />
+                            </>
+                        }
                     </Grid>
+
                     :
                     <TextField fullWidth type='file' inputProps={{ accept: "video/*" }} onChange={handleOnSelectVideo} />
                 }
             </Grid>
 
             {openDialog &&
-                <DeleteDialog2 open={openDialog} setOpen={setOpenDialog} dialog={dialog} setDialog={setDialog} />
+                <DeleteDialog open={openDialog} setOpen={setOpenDialog} dialog={dialog} setDialog={setDialog} />
             }
         </Grid>
     )
 }
 
-const TimeModule = forwardRef(function ({ type }, ref) {
-    const { dataForm, setDataForm } = useContext(filesContext)
+// TIME SECTION ELEMENT
+const TimeForm = forwardRef(function ({ intro }, ref) {
+    const { dataForm, setDataForm } = useContext(databaseContext)
 
-    const [videoForm, setVideoForm] = useState({ start: 0, end: 0, start_intro: 0, end_intro: 0 })
-
-    const { start, end, start_intro, end_intro, } = videoForm
+    const { video_start, video_end, video_start_intro, video_end_intro } = dataForm
 
     const handleClickMark = (value) => {
         const currentTime = ref.current.currentTime * 1
-        const name = value
-        const name2 = 'video_' + value
 
-        setVideoForm({ ...videoForm, [name]: currentTime })
-        setDataForm({ ...dataForm, [name2]: currentTime })
+        setDataForm({ ...dataForm, [value]: currentTime })
     }
     const handleClickGo = (value) => {
-        const example = { start, end, start_intro, end_intro }
+        const time = { video_start, video_end, video_start_intro, video_end_intro }
 
-        ref.current.currentTime = example[value]
+        ref.current.currentTime = time[value]
     }
     const handleChangeInput = (e) => {
         const value = e.target.value * 1 || 0
         const name = e.target.name
-        const name2 = 'video_' + name
 
-        setVideoForm({ ...videoForm, [name]: value })
-        setDataForm({ ...dataForm, [name2]: value })
+        setDataForm({ ...dataForm, [name]: value })
     }
-
-    useEffect(() => {
-        setVideoForm({ ...videoForm, end: dataForm.video_duration })
-        // eslint-disable-next-line
-    }, [dataForm.video_duration])
 
     return (
         <Grid container item xs={12} spacing={1} my={2} alignItems="center">
             <InputItem
-                label={type ? "Inicio intro" : "Inicio"}
-                name={type ? "start_intro" : "start"}
-                value={type ? start_intro : start}
+                label={!intro ? "Inicio" : "Intro inicio"}
+                name={!intro ? "video_start" : "video_start_intro"}
+                value={(!intro ? video_start : video_start_intro) || 0}
                 onChange={handleChangeInput}
-
             />
 
-            <ButtonsItem clickGo={handleClickGo} clickMark={handleClickMark} type={type} value="start" />
+            <ButtonsItem clickGo={handleClickGo} clickMark={handleClickMark} intro={intro || false} value="start" />
 
             <InputItem
-                label={type ? "Fin intro" : "Fin"}
-                name={type ? "end_intro" : "end"}
-                value={type ? end_intro : end}
+                label={!intro ? "Fin" : "Intro fin"}
+                name={!intro ? "video_end" : "video_end_intro"}
+                value={(!intro ? video_end : video_end_intro) || 0}
                 onChange={handleChangeInput}
             />
 
-            <ButtonsItem clickGo={handleClickGo} clickMark={handleClickMark} type={type} value="end" />
+            <ButtonsItem clickGo={handleClickGo} clickMark={handleClickMark} intro={intro || false} value="end" />
         </Grid>
     )
 })
 
+// INPUT ITEM
 function InputItem(props) {
     return <Grid item xs={12} sm={3}
         children={<TextField fullWidth {...props} />}
     />
 }
 
-function ButtonsItem(props) {
-    const { clickGo, clickMark, type, value } = props
-
-    const val = type === "intro" ? value + "_intro" : value
+// BUTTON ITEM
+function ButtonsItem({ clickGo, clickMark, intro, value }) {
+    const val = intro ? value + "_intro" : value
 
     return (
         <Grid item xs={12} sm={3} container spacing={.5}>
@@ -195,14 +218,15 @@ function ButtonsItem(props) {
             <Grid item>
                 <Button
                     variant='contained'
-                    onClick={() => clickMark(val)}
+                    size='small'
+                    onClick={() => clickMark('video_' + val)}
                     color={value === "start" ? 'success' : "error"}
                     children={`Marcar ${value === "start" ? "inicio" : "fin"}`}
                 />
             </Grid>
             {/* GO TO BUTTON */}
             <Grid item>
-                <Button variant="outlined" color='info' onClick={() => clickGo(val)} children="Ir" />
+                <Button variant="outlined" size='small' color='info' onClick={() => clickGo('video_' + val)} children="Ir" />
             </Grid>
         </Grid>
     )

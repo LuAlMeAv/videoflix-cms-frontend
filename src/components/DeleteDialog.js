@@ -14,8 +14,8 @@ export default function DeleteDialog({ open, setOpen, dialog, setDialog }) {
     };
 
     const handleClose = () => {
-        setOpen(false);
         setDialog(initialState)
+        setOpen(false);
     };
 
     return (

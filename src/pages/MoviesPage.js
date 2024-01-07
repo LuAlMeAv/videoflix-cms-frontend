@@ -1,89 +1,119 @@
 import { useContext, useEffect, useState } from 'react';
-import { Box, Container, IconButton, styled } from '@mui/material';
-import { DataGrid, esES } from '@mui/x-data-grid';
-import { Brightness1, Delete, Edit } from '@mui/icons-material';
-import { databaseContext } from '../contexts/DatabaseProvider';
-import DeleteDialog2 from '../components/DeleteDialog';
 import { useNavigate } from 'react-router-dom';
+import { enqueueSnackbar } from 'notistack';
+import { DataGrid, esES } from '@mui/x-data-grid';
+import { Box, Container, IconButton, Tooltip, styled } from '@mui/material';
+import { Cancel, CheckCircle, DeleteForeverOutlined, EditOutlined } from '@mui/icons-material';
+import { databaseContext } from '../contexts/DatabaseProvider';
 import { filesContext } from '../contexts/FilesProvider';
-import { globalContext } from '../contexts/GlobalProvider';
+import DeleteDialog2 from '../components/DeleteDialog';
 
 const getFormatedDate = (p) => {
     const date = new Date(p.value)
     const year = date.getFullYear()
-    const month = date.getMonth() > 9 ? date.getMonth() : '0' + date.getMonth()
+    const real_month = date.getMonth() + 1
+    const month = real_month > 9 ? real_month : '0' + real_month
     const day = date.getDate() > 9 ? date.getDate() : '0' + date.getDate()
 
     return year > 1000 ? `${day}/${month}/${year}` : '00/00/00'
 }
 
 export default function AutoHeightOverlayNoSnap() {
-    const { getAllMovies, allMovies, deleteMovie } = useContext(databaseContext)
-    const { deleteFile } = useContext(filesContext)
-    const { setResponse } = useContext(globalContext)
+    const { getAllMovies, allMovies, deleteData, getElementById } = useContext(databaseContext)
+    const { deleteFiles } = useContext(filesContext)
+
+    const { REACT_APP_API_URL } = process.env
 
     const [openDialog, setOpenDialog] = useState(false)
     const [dialog, setDialog] = useState()
 
     const navigate = useNavigate()
 
-    const handleClickDelete = (data) => {
-        setOpenDialog(true)
+    const handleClickDelete = async (data) => {
+        const response = await getElementById('movie', data._id)
 
-        const handleDelete = async () => {
-            const fileID = data.video_path.split('/').reverse()[0]
+        if (response.element) {
+            const element = response.element
 
-            const responseFile = await deleteFile(fileID)
+            setOpenDialog(true)
 
-            if (responseFile?.resStatus === "error" && data.video_status === "success") {
-                return setResponse(responseFile)
+            const handleDelete = async () => {
+                const responseFiles = await deleteFiles(element)
+                console.log(responseFiles)
+
+                const responseDB = await deleteData('movie', element._id)
+
+                enqueueSnackbar(responseDB.message, { variant: responseDB.resStatus })
             }
 
-            const objectID = data._id
-
-            const responseDB = await deleteMovie(objectID)
-
-            setResponse(responseDB)
+            return setDialog({
+                title: "Desea eliminar la película?",
+                content: "Estas seguro que quieres eliminar la película: " + data.title,
+                actionFunction: handleDelete
+            })
         }
-
-        setDialog({
-            title: "Desea eliminar la película?",
-            content: "Estas seguro que quieres eliminar la película: " + data.title,
-            actionFunction: handleDelete
-        })
+        enqueueSnackbar('El elemento no fue encontrado', { variant: 'error' })
     }
 
+    const renderPosterImage = (p) => {
+        const { poster_path, title } = p.row
+
+        return <img src={poster_path.includes('http') ? poster_path : `${REACT_APP_API_URL}/file/${poster_path}`} alt={title} height='100%' />
+    }
     const renderButtonsAction = (p) => {
         return <>
-            <IconButton color='warning' onClick={() => navigate("/" + p.row._id)}>
-                <Edit />
-            </IconButton>
-            <IconButton color='error' onClick={() => handleClickDelete(p.row)}>
-                <Delete />
-            </IconButton>
+            <Tooltip title='Editar'>
+                <IconButton color='info' onClick={() => navigate("/movie/" + p.row._id)} >
+                    <EditOutlined />
+                </IconButton>
+            </Tooltip>
+            <Tooltip title='Eliminar'>
+                <IconButton color='error' onClick={() => handleClickDelete(p.row)}>
+                    <DeleteForeverOutlined />
+                </IconButton>
+            </Tooltip>
         </>
     }
-    const renderVideoOnline = (e) => {
-        return <Brightness1 fontSize='small' color={e.row.video_status} />
+    const renderVideoOnline = (p) => {
+        return (
+            <Tooltip title='Video?'>
+                {p.row.video_status === 'success' ?
+                    <CheckCircle fontSize='small' color='success' />
+                    :
+                    <Cancel fontSize='small' color='error' />
+                }
+            </Tooltip>
+        )
+    }
+    const renderOnline = (p) => {
+        return (
+            <Tooltip title='En linea?'>
+                {p.value ?
+                    <CheckCircle fontSize='small' color='success' />
+                    :
+                    <Cancel fontSize='small' color='error' />
+                }
+            </Tooltip>
+        )
     }
 
     const columns = [
         {
             field: 'poster_path',
             headerName: 'Poster',
-            width: 90,
+            width: 70,
             headerAlign: 'center',
             align: 'center',
             disableColumnMenu: true,
             sortable: false,
-            renderCell: (p) => <img src={p.row.poster_path} alt={p.row.title} height='100%' />,
+            renderCell: renderPosterImage,
         },
-        { field: 'title', headerName: 'Título', width: 250, headerAlign: 'center' },
-        { field: 'views', headerName: 'Vistas', width: 90, headerAlign: 'center', align: 'center', },
+        { field: 'title', headerName: 'Título', width: 270, headerAlign: 'center' },
+        { field: 'views', headerName: 'Vistas', width: 90, headerAlign: 'center', align: 'center' },
         {
             field: 'createdAt',
             headerName: 'Fecha de creación',
-            width: 100,
+            width: 120,
             headerAlign: 'center',
             align: 'center',
             valueGetter: getFormatedDate,
@@ -91,16 +121,23 @@ export default function AutoHeightOverlayNoSnap() {
         {
             field: 'updatedAt',
             headerName: 'Última edición',
-            width: 100,
+            width: 120,
             headerAlign: 'center',
             align: 'center',
             valueGetter: getFormatedDate,
         },
-        { field: 'online', headerName: 'En linea', width: 70, headerAlign: 'center' },
+        {
+            field: 'online',
+            headerName: 'En linea',
+            width: 80,
+            headerAlign: 'center',
+            align: 'center',
+            renderCell: renderOnline
+        },
         {
             field: 'video_status',
             headerName: 'Video',
-            width: 70,
+            width: 80,
             headerAlign: 'center',
             align: "center",
             renderCell: renderVideoOnline
@@ -123,7 +160,7 @@ export default function AutoHeightOverlayNoSnap() {
     }, [])
 
     return (
-        <Container onLoad={() => getAllMovies()}>
+        <Container>
             <DataGrid
                 autoHeight
                 rowSelection={false}
@@ -135,11 +172,11 @@ export default function AutoHeightOverlayNoSnap() {
                     noRowsOverlay: CustomNoRowsOverlay
                 }}
                 sx={{ '--DataGrid-overlayHeight': '300px' }}
-                pageSizeOptions={[5, 10, 25]}
+                pageSizeOptions={[10, 25, 50]}
                 initialState={{
                     pagination: {
                         paginationModel: {
-                            pageSize: 5,
+                            pageSize: 10,
                         },
                     },
                 }}

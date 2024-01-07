@@ -1,6 +1,6 @@
-import { createContext, useContext, useState } from "react"
-import { filesContext } from "./FilesProvider";
+import { createContext, useContext, useState } from "react";
 import { enqueueSnackbar } from "notistack";
+import { databaseContext } from "./DatabaseProvider";
 
 export const tmdbContext = createContext();
 
@@ -15,7 +15,7 @@ const getCertificationValue = (response) => {
 
 export default function TmdbProvider({ children }) {
     const { REACT_APP_TMDB_URL_API, REACT_APP_TMDB_API_KEY } = process.env
-    const { searchType } = useContext(filesContext)
+    const { searchType } = useContext(databaseContext)
 
     const [searchList, setSearchList] = useState([])
 
@@ -34,21 +34,23 @@ export default function TmdbProvider({ children }) {
     const getMoreInfoTMDB = async (id) => {
         const urlQuery = `${REACT_APP_TMDB_URL_API}/${searchType}/${id}?api_key=${REACT_APP_TMDB_API_KEY}&language=es-MX`
 
-        return await fetch(urlQuery)
-            .then(res => { return res.json() })
+        return fetch(urlQuery)
+            .then(async (res) => await res.json())
             .catch(err => errorResponse(err))
     }
     const getMoreImagesTMDB = async (id) => {
         const urlQuery = `${REACT_APP_TMDB_URL_API}/${searchType}/${id}/images?api_key=${REACT_APP_TMDB_API_KEY}`
 
-        return await fetch(urlQuery)
-            .then(res => { return res.json() })
+        return fetch(urlQuery)
+            .then(async (res) => await res.json())
             .catch(err => errorResponse(err))
     }
     const getAlternativesTitlesTMDB = async (id) => {
-        return fetch(`${REACT_APP_TMDB_URL_API}/${searchType}/${id}/alternative_titles?api_key=${REACT_APP_TMDB_API_KEY}`)
-            .then(response => response.json())
-            .then(response => {
+        const urlQuery = `${REACT_APP_TMDB_URL_API}/${searchType}/${id}/alternative_titles?api_key=${REACT_APP_TMDB_API_KEY}`
+
+        return fetch(urlQuery)
+            .then(async (res) => {
+                const response = await res.json()
                 const titles = searchType === "tv" ? response.results : response.titles
 
                 return titles.map(t => {
@@ -60,7 +62,7 @@ export default function TmdbProvider({ children }) {
     const getCertificationTMDB = async (id) => {
         const urlQuery = `${REACT_APP_TMDB_URL_API}/${searchType}/${id}/${searchType === "movie" ? "release_dates" : "content_ratings"}?api_key=${REACT_APP_TMDB_API_KEY}`
 
-        return await fetch(urlQuery)
+        return fetch(urlQuery)
             .then(async (res) => {
                 const response = await res.json()
                 return getCertificationValue(response)
@@ -70,22 +72,22 @@ export default function TmdbProvider({ children }) {
     const getSeasonEpisodesTMDB = async (id, season) => {
         const urlQuery = `${REACT_APP_TMDB_URL_API}/tv/${id}/season/${season}?language=es-MX&api_key=${REACT_APP_TMDB_API_KEY}`
 
-        return await fetch(urlQuery)
-            .then(res => { return res.json() })
+        return fetch(urlQuery)
+            .then(async (res) => await res.json())
             .catch(err => errorResponse(err))
     }
     const getMoreSeasonImagesTMDB = async (id, season) => {
         const urlQuery = `${REACT_APP_TMDB_URL_API}/${searchType}/${id}/season/${season}/images?api_key=${REACT_APP_TMDB_API_KEY}`
 
-        return await fetch(urlQuery)
-            .then(res => { return res.json() })
+        return fetch(urlQuery)
+            .then(async (res) => await res.json())
             .catch(err => errorResponse(err))
     }
     const getMoreEpisodeImagesTMDB = async (id, season, episode) => {
         const urlQuery = `${REACT_APP_TMDB_URL_API}/tv/${id}/season/${season}/episode/${episode}/images?api_key=${REACT_APP_TMDB_API_KEY}`
 
-        return await fetch(urlQuery)
-            .then(res => { return res.json() })
+        return fetch(urlQuery)
+            .then(async (res) => await res.json())
             .catch(err => errorResponse(err))
     }
 

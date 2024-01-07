@@ -1,130 +1,161 @@
 import { useContext, useEffect, useState } from 'react'
-import { Autocomplete, Backdrop, Button, CircularProgress, Grid, TextField } from '@mui/material'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useSnackbar } from 'notistack'
-import { filesContext } from '../contexts/FilesProvider'
+import { Autocomplete, Backdrop, Button, CircularProgress, Grid, Stack, Switch, TextField, Typography } from '@mui/material'
 import ImagesElement from './ImagesElement'
 import VideoElement from './VideoElement'
-import { useParams } from 'react-router-dom'
+import { databaseContext } from '../contexts/DatabaseProvider'
+import { filesContext } from '../contexts/FilesProvider'
 
 export default function UploadForm() {
-    const { dataForm, setDataForm, clearData, saveMovie, saveSerie, saveSeason, saveEpisode, searchType, serieE, seasonE, episodeE, loadingResponse, getDataFromBackend, updateMovieData } = useContext(filesContext)
+    // const { REACT_APP_API_URL } = process.env
+    const { clearFiles, loadingResponse, uploadFiles, updateFiles } = useContext(filesContext)
+    const { searchType, clearData, dataForm, setDataForm, updateData, saveData, getElementByName, getElementById, setElementType, elementType, uniqueTitle } = useContext(databaseContext)
 
-    const { title, original_title, tagline, season_number, episode_number, episode_name, year, certification, duration, genre_ids, overview } = dataForm;
+    const { title, original_title, tagline, season_number, episode_number, episode_name, year, certification, duration, genre_ids, overview, online } = dataForm;
 
     const [videoState, setVideoState] = useState('play')
+    const [change, setChange] = useState(false)
 
     const { enqueueSnackbar } = useSnackbar();
 
-    const { id } = useParams()
+    const { edit_element_type, id } = useParams()
+    const navigate = useNavigate()
 
     const handleInputChange = (e) => {
         const name = e.target.name
-        const value = e.target.value
+        let value = e.target.value
 
         if (name === "title") {
+            setElementType(searchType === 'tv' ? 'serie' : 'movie')
             setDataForm({ ...dataForm, season_number: "", episode_number: "", episode_name: "", [name]: value })
         }
         else if (name === "season_number") {
-            setDataForm({ ...dataForm, episode_number: "", episode_name: "", [name]: value === "" ? "" : value * 1 })
+            value = value * 1 || ""
+
+            setElementType(value === "" ? 'serie' : 'season')
+            setDataForm({ ...dataForm, episode_number: "", episode_name: "", [name]: value === "" ? "" : value })
         }
         else if (name === "episode_number") {
-            setDataForm({ ...dataForm, episode_name: "Episodio " + value, video_path: "", [name]: value * 1 })
+            value = value * 1 || ""
+
+            setElementType(value === "" ? 'season' : 'episode')
+            setDataForm({ ...dataForm, episode_name: !value ? "" : "Episodio " + value, video_path: "", [name]: value })
+        }
+        else if (name === "year") {
+            value = value * 1 || ""
+            setDataForm({ ...dataForm, [name]: value })
         }
         else {
             setDataForm({ ...dataForm, [name]: value })
         }
     }
-    const handleChangeGenres = (value) => {
-        setDataForm({ ...dataForm, genre_ids: value })
-    }
-    const handleClickSave = () => {
-        // MOVIE ITEM
-        if (searchType === "movie") {
-            if (!title || !year || !duration || genre_ids.length < 1) {
-                return enqueueSnackbar('Alguno de los siguientes campos está vacío: Titulo, Año, Duración o Generos', { variant: 'error' })
-            }
-            if (!dataForm.poster_path || !dataForm.backdrop_path) {
-                return enqueueSnackbar('Debes seleccionar una imágen de fondo y un Póster', { variant: 'error' })
-            }
-            if (!dataForm.video_path) {
-                return enqueueSnackbar('Debes seleccionar un video', { variant: 'error' })
-            }
-            setVideoState('stop')
-            saveMovie()
-        } // SERIE ITEM
-        else if (dataForm.season_number === "") {
-            if (!title || !year || genre_ids.length < 1) {
-                return enqueueSnackbar('Alguno de los siguientes campos está vacío: Titulo, Año o Generos', { variant: 'error' })
-            }
-            if (!dataForm.poster_path || !dataForm.backdrop_path) {
-                return enqueueSnackbar('Debes seleccionar una imágen de fondo y un Póster', { variant: 'error' })
-            }
-            saveSerie()
-        } // SEASON ITEM
-        else if (dataForm.episode_number === "") {
-            if (!title || !season_number) {
-                return enqueueSnackbar('Alguno de los siguientes campos está vacío: Titulo o Temporada', { variant: 'error' })
-            }
-            if (!dataForm.poster_path) {
-                return enqueueSnackbar('Debes seleccionar una imágen de Póster', { variant: 'error' })
-            }
-            saveSeason()
-        } // EPISODE ITEM
-        else {
-            if (!title || !season_number || !episode_number || !episode_name || !duration) {
-                return enqueueSnackbar('Alguno de los siguientes campos está vacío: Titulo, Temporada, Episodio, Nombre del Episodio o Duración', { variant: 'error' })
-            }
-            if (!dataForm.backdrop_path) {
-                return enqueueSnackbar('Debes seleccionar una imágen de Fondo', { variant: 'error' })
-            }
-            if (!dataForm.video_path) {
-                return enqueueSnackbar('Debes agregar un video', { variant: 'error' })
-            }
-            setVideoState('stop')
-            saveEpisode()
+
+    const handleChangeGenres = (value) => setDataForm({ ...dataForm, genre_ids: value })
+
+    const handleClickSave = async () => {
+        setVideoState('stop')
+
+        const exist = await getElementByName()
+
+        if (exist.resStatus === 'success') {
+            return enqueueSnackbar('Este elemento ya existe', { variant: 'warning' })
+        }
+
+        const responseFiles = await uploadFiles()
+
+        const data = {
+            ...dataForm,
+            video_path: responseFiles.video ? responseFiles.video : dataForm.video_path,
+            poster_path: responseFiles.poster ? responseFiles.poster : dataForm.poster_path,
+            backdrop_path: responseFiles.backdrop ? responseFiles.backdrop : dataForm.backdrop_path
+        }
+
+        const responseSave = await saveData(data)
+
+        enqueueSnackbar(responseSave.message, { variant: responseSave.resStatus })
+
+        if (responseSave.resStatus === 'success') {
+            navigate(-1)
         }
     }
-    const handleClickSaveChanges = (id) => {
-        updateMovieData(id)
+
+    const handleClickSaveChanges = async () => {
+        setVideoState('stop')
+        console.log(change)
+        const newFiles = await updateFiles()
+
+        const newData = {
+            ...dataForm,
+            unique_title: uniqueTitle(),
+            video_path: newFiles.video ? newFiles.video : dataForm.video_path,
+            poster_path: newFiles.poster ? newFiles.poster : dataForm.poster_path,
+            backdrop_path: newFiles.backdrop ? newFiles.backdrop : dataForm.backdrop_path,
+        }
+
+        const response = await updateData(newData)
+
+        enqueueSnackbar(response.message, { variant: response.resStatus })
+        
+        if (response.resStatus === 'success') {
+            navigate(-1)
+        }
     }
 
+    const fillEditData = async () => {
+        const response = await getElementById(edit_element_type, id)
+
+        if (!response.element) {
+            return enqueueSnackbar('No se ha encontrado ningún elemento', { variant: 'error' })
+        }
+
+        setDataForm({ ...dataForm, ...response.element })
+    }
+
+    const handleClear = () => {
+        clearFiles()
+        clearData()
+    }
 
     useEffect(() => {
-        clearData()
+        handleClear()
+        setElementType(searchType === 'tv' ? 'serie' : 'movie')
+        setChange(false)
 
         if (id) {
-            getDataFromBackend(id)
+            fillEditData()
+            setElementType(edit_element_type)
         }
         // eslint-disable-next-line
     }, [id])
 
     return (
-        <Grid container spacing={2} mt={3} maxWidth={"720px"} mx="auto" pr={3}>
+        <Grid container spacing={2} mt={3} maxWidth={"720px"} mx="auto" pr={3} onChange={() => setChange(true)}>
             <InputItem xs={12} label="Titulo" name="title" value={title} onChange={handleInputChange} />
             <InputItem xs={12} label="Titulo original" name="original_title" value={original_title} onChange={handleInputChange} />
-            <InputItem xs={12} label="Eslogan" name="tagline" value={tagline || ""} onChange={handleInputChange} />
+            <InputItem xs={12} label="Eslogan" name="tagline" value={tagline} onChange={handleInputChange} />
 
             {/* IF IS SERIES */}
-            {searchType === "tv" && <>
+            {elementType !== "movie" && <>
                 <InputItem
                     xs={7}
                     fullWidth
                     label="Temporada"
                     name="season_number"
-                    value={season_number === 0 ? 0 : season_number > 0 ? season_number : ""}
+                    value={season_number}
                     onChange={handleInputChange}
-                    color={season_number >= 0 ? 'info' : 'error'}
-                    disabled={(title === "" || serieE.title) && true}
+                    color={season_number ? 'info' : 'error'}
+                    disabled={!title && true}
                 />
                 <InputItem
                     xs={5}
                     fullWidth
                     label="Episodio"
                     name="episode_number"
-                    value={episode_number || ""}
+                    value={episode_number}
                     onChange={handleInputChange}
-                    color={episode_number > 0 ? 'info' : 'error'}
-                    disabled={(season_number === "" || seasonE.season_number) && true}
+                    color={episode_number ? 'info' : 'error'}
+                    disabled={!season_number && true}
                 />
                 <InputItem
                     xs={12}
@@ -134,7 +165,7 @@ export default function UploadForm() {
                     value={episode_name}
                     color={episode_name ? 'info' : 'error'}
                     onChange={handleInputChange}
-                    disabled={(episode_number === "" || episodeE.episode_name) && true}
+                    disabled={!episode_number && true}
                 />
             </>}
 
@@ -142,12 +173,12 @@ export default function UploadForm() {
                 xs={4}
                 label="Año"
                 name="year"
-                value={year * 1 || ""}
+                value={year}
                 color={year > 1000 ? 'info' : 'error'}
                 onChange={handleInputChange}
             />
-            <InputItem xs={4} label="Clasificación" name="certification" value={certification?.toUpperCase() || ""} onChange={handleInputChange} />
-            <InputItem xs={4} label="Duración" name="duration" value={duration?.toLowerCase() || ""} onChange={handleInputChange} />
+            <InputItem xs={4} label="Clasificación" name="certification" value={certification?.toUpperCase()} onChange={handleInputChange} />
+            <InputItem xs={4} label="Duración" name="duration" value={duration?.toLowerCase()} onChange={handleInputChange} />
             <GeneresSelectorInput value={genre_ids} setGenres={handleChangeGenres} />
             <InputItem xs={12} label="Resumen" name="overview" value={overview} onChange={handleInputChange} multiline maxRows={6} />
 
@@ -159,23 +190,37 @@ export default function UploadForm() {
                 <VideoElement videoState={videoState} setVideoState={setVideoState} />
             }
 
+            <Grid item xs={12}>
+                <Typography>Quieres que este contenido este disponible ahora?</Typography>
+                <Stack direction="row" alignItems="center">
+                    <Switch
+                        color='success'
+                        checked={online}
+                        onChange={(e) => setDataForm({ ...dataForm, online: e.target.checked })}
+                    />
+                    <Typography >{online ? 'Sí' : 'No'}</Typography>
+                </Stack>
+            </Grid>
+
             {/* BUTTON AREA */}
             <Grid item xs={12} md={8} container spacing={2} mx="auto" justifyContent="center" >
                 {id ?
-                    <ButtonItem onClick={() => handleClickSaveChanges(id)} variant="contained" children="Actualizar" />
+                    <ButtonItem onClick={handleClickSaveChanges} variant="contained" btnName="update" />
                     :
                     <>
-                        <ButtonItem onClick={clearData} variant='outlined' children="Limpiar" />
+                        <ButtonItem onClick={handleClear} variant='outlined' btnName="clear" />
 
-                        <ButtonItem onClick={handleClickSave} variant='contained' children={
-                            searchType === "movie" ? "Guardar Pelicula" :
-                                season_number === "" ? "Guardar Serie" :
-                                    episode_number === "" ? "Guardar Temporada" :
-                                        "Guardar Episodio"
+                        <ButtonItem onClick={handleClickSave} variant='contained' btnName={
+                            elementType
+                            // searchType === "movie" ? "movie" :
+                            //     season_number === "" ? "serie" :
+                            //         episode_number === "" ? "season" :
+                            //             "episode"
                         } />
                     </>
                 }
             </Grid>
+
             {/* LOADING BACKDROP */}
             {loadingResponse &&
                 <Backdrop
@@ -188,8 +233,9 @@ export default function UploadForm() {
     )
 }
 
+// INPUT ITEM
 function InputItem(props) {
-    const { dataForm, setDataForm } = useContext(filesContext)
+    const { dataForm, setDataForm } = useContext(databaseContext)
 
     const handleOnBlur = (e) => {
         const name = e.target.name
@@ -209,17 +255,27 @@ function InputItem(props) {
     )
 }
 
-function ButtonItem(props) {
+// BUTTONS
+function ButtonItem({ onClick, variant, btnName }) {
+    const btnContent = {
+        'update': 'Actualizar',
+        'clear': 'Limpiar',
+        'movie': 'Guardar Pelicula',
+        'serie': 'Guardar Serie',
+        'season': 'Guardar Temporada',
+        'episode': 'Guardar Episodio',
+    }
+
     return (
         <Grid item xs={12} md={6} >
-            <Button fullWidth {...props} />
+            <Button fullWidth onClick={() => onClick(btnName)} variant={variant} children={btnContent[btnName]} />
         </Grid>
     )
 }
 
 // GENERES INPUT CHECKBOX
 function GeneresSelectorInput({ value, setGenres }) {
-    const { searchType } = useContext(filesContext)
+    const { searchType } = useContext(databaseContext)
 
     const [genresValue, setGenresValue] = useState([])
 
