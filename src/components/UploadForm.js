@@ -6,10 +6,12 @@ import ImagesElement from './ImagesElement'
 import VideoElement from './VideoElement'
 import { databaseContext } from '../contexts/DatabaseProvider'
 import { filesContext } from '../contexts/FilesProvider'
+import { globalContext } from '../contexts/GlobalProvider'
 
 export default function UploadForm() {
     // const { REACT_APP_API_URL } = process.env
-    const { clearFiles, loadingResponse, uploadFiles, updateFiles } = useContext(filesContext)
+    const { loadingResponse } = useContext(globalContext)
+    const { clearFiles, uploadFiles, updateFiles } = useContext(filesContext)
     const { searchType, clearData, dataForm, setDataForm, updateData, saveData, getElementByName, getElementById, setElementType, elementType, uniqueTitle } = useContext(databaseContext)
 
     const { title, original_title, tagline, season_number, episode_number, episode_name, year, certification, duration, genre_ids, overview, online } = dataForm;
@@ -96,7 +98,7 @@ export default function UploadForm() {
         const response = await updateData(newData)
 
         enqueueSnackbar(response.message, { variant: response.resStatus })
-        
+
         if (response.resStatus === 'success') {
             navigate(-1)
         }

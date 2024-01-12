@@ -1,12 +1,14 @@
 import { createContext, useContext, useState } from "react"
 import { useSnackbar } from "notistack"
 import { databaseContext } from "./DatabaseProvider"
+import { globalContext } from "./GlobalProvider"
 
 export const filesContext = createContext()
 
 export default function FilesProvider({ children }) {
     const { REACT_APP_API_URL } = process.env
     const { dataForm, setDataForm, uniqueTitle, elementType } = useContext(databaseContext)
+    const { setLoadingResponse } = useContext(globalContext)
 
     const { enqueueSnackbar } = useSnackbar();
 
@@ -14,12 +16,12 @@ export default function FilesProvider({ children }) {
     const [videoFile, setVideoFile] = useState({})
     const [posterFile, setPosterFile] = useState({})
     const [backdropFile, setBackdropFile] = useState({})
-    // INFORMATION STATES
-    // const [loadingResponse, setLoadingResponse] = useState(false)
 
 
     ////--- POST
     const uploadSingleFile = async (file_type) => {
+        setLoadingResponse(true)
+
         const formData = new FormData()
 
         const files = {
@@ -36,8 +38,8 @@ export default function FilesProvider({ children }) {
             method: 'POST',
             body: formData
         })
-            .then(async (res) => await res.json())
-            .catch(err => console.error(err))
+            .then(thenFuntion)
+            .catch(catchFuntion)
     }
     const uploadFiles = async () => {
         let responses = {}
@@ -90,6 +92,8 @@ export default function FilesProvider({ children }) {
 
     ////--- PUT
     const updateSingleFile = async (id) => {
+        setLoadingResponse(true)
+
         return fetch(`${REACT_APP_API_URL}/file/${id}`, {
             method: 'PUT',
             headers: {
@@ -97,8 +101,8 @@ export default function FilesProvider({ children }) {
             },
             body: JSON.stringify({ unique_title: uniqueTitle() })
         })
-            .then(async (res) => await res.json())
-            .catch(err => console.error(err))
+            .then(thenFuntion)
+            .catch(catchFuntion)
     }
     const updateFiles = async () => {
         const responseFiles = await uploadFiles()
@@ -123,11 +127,13 @@ export default function FilesProvider({ children }) {
 
     ////--- DELETE
     const deleteSingleFile = async (id) => {
+        setLoadingResponse(true)
+
         return fetch(`${REACT_APP_API_URL}/file/${id}`, {
             method: 'DELETE'
         })
-            .then(async (res) => await res.json())
-            .catch(err => console.error(err))
+            .then(thenFuntion)
+            .catch(catchFuntion)
     }
     const deleteFiles = async (element) => {
         const { poster_path, backdrop_path, video_path } = element
@@ -146,6 +152,7 @@ export default function FilesProvider({ children }) {
 
         return responses
     }
+
     const clearFiles = () => {
         setVideoFile({})
         setPosterFile({})
@@ -153,6 +160,15 @@ export default function FilesProvider({ children }) {
         window.URL.revokeObjectURL(dataForm.video_path)
         window.URL.revokeObjectURL(dataForm.poster_path)
         window.URL.revokeObjectURL(dataForm.backdrop_path)
+    }
+
+    const thenFuntion = async (res) => {
+        setLoadingResponse(false)
+        return await res.json()
+    }
+    const catchFuntion = async (err) => {
+        setLoadingResponse(false)
+        console.error(err)
     }
 
     return (

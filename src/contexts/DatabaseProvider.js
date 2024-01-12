@@ -1,4 +1,5 @@
-import { createContext, useState } from "react"
+import { createContext, useContext, useState } from "react"
+import { globalContext } from "./GlobalProvider"
 
 export const databaseContext = createContext()
 
@@ -30,17 +31,19 @@ const formInitialState = {
 }
 
 export default function DatabaseProvider({ children }) {
+    const { setLoadingResponse } = useContext(globalContext)
     const { REACT_APP_API_URL } = process.env
+
     // const REACT_APP_API_URL = 'http://192.168.1.222:5000'
     const [searchType, setSearchType] = useState("movie")
     const [elementType, setElementType] = useState("movie")
-
     const [dataForm, setDataForm] = useState(formInitialState)
-
     const [allMovies, setAllMovies] = useState([])
 
     ////--- POST
     const saveData = async (data) => {
+        setLoadingResponse(true)
+
         data.unique_title = uniqueTitle()
         delete data.id
 
@@ -58,33 +61,34 @@ export default function DatabaseProvider({ children }) {
             },
             body: JSON.stringify(data)
         })
-            .then(async (res) => await res.json())
-            .catch(err => console.error(err))
+            .then(thenFuntion)
+            .catch(catchFuntion)
     }
 
     ////--- GET
     const getAllMovies = () => {
+        setLoadingResponse(true)
         fetch(`${REACT_APP_API_URL}/db/all/movies`)
             .then(async (res) => {
                 const response = await res.json()
                 const result = await getOnlineVideo(response)
                 setAllMovies(result)
+                setLoadingResponse(false)
             })
-            .catch(err => console.error(err))
+            .catch(catchFuntion)
     }
-
     const getElementByName = async () => {
+        setLoadingResponse(true)
         return fetch(`${REACT_APP_API_URL}/db/${elementType}/t/${uniqueTitle()}`)
-            .then(async (res) => await res.json())
-            .catch(err => console.error(err))
+            .then(thenFuntion)
+            .catch(catchFuntion)
     }
-
     const getElementById = async (save_type, id) => {
+        setLoadingResponse(true)
         return fetch(`${REACT_APP_API_URL}/db/${save_type}/${id}`)
-            .then(async (res) => await res.json())
-            .catch(err => console.error(err))
+            .then(thenFuntion)
+            .catch(catchFuntion)
     }
-
     const getOnlineVideo = async (elements) => {
         const videosOnline = await Promise.all(elements.map(async (element) => {
             if (!element.video_path) {
@@ -103,7 +107,7 @@ export default function DatabaseProvider({ children }) {
                     updateData({ video_path: '' }, element._id)
                     return { ...element, video_status: 'error' }
                 })
-                .catch(err => console.error(err))
+                .catch(catchFuntion)
         }))
 
         return videosOnline
@@ -111,6 +115,7 @@ export default function DatabaseProvider({ children }) {
 
     ////--- PUT
     const updateData = async (newData, id) => {
+        setLoadingResponse(true)
         return fetch(`${REACT_APP_API_URL}/db/${elementType}/${id || dataForm._id}`, {
             method: 'PUT',
             headers: {
@@ -118,20 +123,22 @@ export default function DatabaseProvider({ children }) {
             },
             body: JSON.stringify(newData)
         })
-            .then(async (res) => await res.json())
-            .catch(err => console.error(err))
+            .then(thenFuntion)
+            .catch(catchFuntion)
     }
 
     ////--- DELETE
     const deleteData = async (element_type, id) => {
+        setLoadingResponse(true)
         return fetch(`${REACT_APP_API_URL}/db/${element_type}/${id}`, {
             method: 'DELETE'
         })
             .then(async (res) => {
                 getAllMovies()
+                setLoadingResponse(false)
                 return await res.json()
             })
-            .catch(err => console.error(err))
+            .catch(catchFuntion)
     }
 
     const clearData = () => setDataForm(formInitialState)
@@ -155,6 +162,15 @@ export default function DatabaseProvider({ children }) {
         }
 
         return video_name[elementType].toLowerCase()
+    }
+
+    const thenFuntion = async (res) => {
+        setLoadingResponse(false)
+        return await res.json()
+    }
+    const catchFuntion = async (err) => {
+        setLoadingResponse(false)
+        console.error(err)
     }
 
     return (

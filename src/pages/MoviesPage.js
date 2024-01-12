@@ -5,6 +5,7 @@ import { DataGrid, esES } from '@mui/x-data-grid';
 import { Box, Container, IconButton, Tooltip, styled } from '@mui/material';
 import { Cancel, CheckCircle, DeleteForeverOutlined, EditOutlined } from '@mui/icons-material';
 import { databaseContext } from '../contexts/DatabaseProvider';
+import { globalContext } from '../contexts/GlobalProvider';
 import { filesContext } from '../contexts/FilesProvider';
 import DeleteDialog2 from '../components/DeleteDialog';
 
@@ -20,6 +21,7 @@ const getFormatedDate = (p) => {
 
 export default function AutoHeightOverlayNoSnap() {
     const { getAllMovies, allMovies, deleteData, getElementById } = useContext(databaseContext)
+    const { loadingResponse } = useContext(globalContext)
     const { deleteFiles } = useContext(filesContext)
 
     const { REACT_APP_API_URL } = process.env
@@ -168,6 +170,7 @@ export default function AutoHeightOverlayNoSnap() {
                 columns={columns}
                 getRowId={(row) => row._id}
                 rows={allMovies}
+                loading={loadingResponse}
                 slots={{
                     noRowsOverlay: CustomNoRowsOverlay
                 }}
