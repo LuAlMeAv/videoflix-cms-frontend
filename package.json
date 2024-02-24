@@ -1,5 +1,5 @@
 {
-  "name": "videoflix",
+  "name": "videoflix-cms-frontend",
   "version": "0.2.0",
   "private": true,
   "dependencies": {
