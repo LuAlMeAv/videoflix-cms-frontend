@@ -17,7 +17,7 @@ const style = {
     pr: 2,
 };
 
-export default function SelectImageModal({ open, setOpen, images, type }) {
+export default function SelectImageModal({ open, setOpen, images, type, setChange }) {
     const { REACT_APP_TMDB_URL_IMG_POSTER, REACT_APP_TMDB_URL_IMG_BACKDROP } = process.env
     const { dataForm, setDataForm } = useContext(databaseContext)
 
@@ -26,6 +26,7 @@ export default function SelectImageModal({ open, setOpen, images, type }) {
     const handleImageSelect = (path) => {
         setDataForm({ ...dataForm, [type === 'poster' ? 'poster_path' : 'backdrop_path']: urlPath + path })
         setOpen(false)
+        setChange(true)
     }
 
     return (
@@ -41,6 +42,7 @@ export default function SelectImageModal({ open, setOpen, images, type }) {
                         sm={type === "poster" ? 4 : 6}
                         md={type === "poster" ? 3 : 4}
                         onClick={() => handleImageSelect(img.file_path)}
+                        sx={{ transition: 'ease all .3s', ':hover': { scale: '1.1' } }}
                         children={<>
                             {img.iso_639_1 &&
                                 <Typography
@@ -53,6 +55,7 @@ export default function SelectImageModal({ open, setOpen, images, type }) {
                                 loading='lazy'
                                 src={urlPath + img.file_path}
                                 alt={img.file_path}
+                                style={{ cursor: 'pointer' }}
                             />
                         </>}
                     />

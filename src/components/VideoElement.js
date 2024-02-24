@@ -4,7 +4,6 @@ import { Cancel, CheckCircle, Delete } from '@mui/icons-material'
 import { filesContext } from '../contexts/FilesProvider'
 import DeleteDialog from './DeleteDialog'
 import { databaseContext } from '../contexts/DatabaseProvider'
-import { enqueueSnackbar } from 'notistack'
 
 const formatRuntime = (runtime) => {
     const hours = Math.floor(runtime / 60)
@@ -14,13 +13,12 @@ const formatRuntime = (runtime) => {
     return `${hours > 0 ? hours + "h " : ""}${minutes > 0 ? minutesFormat + "m" : ""}`
 }
 
-// const dialogInitialState = { data: {}, title: "", content: "", actionFunction: () => { } }
 const videoInitialState = { video_path: '', video_start: '', video_end: '', video_start_intro: '', video_end_intro: '' }
 
-export default function VideoElement({ videoState, setVideoState }) {
+export default function VideoElement({ videoState, setVideoState, setChange }) {
     const { REACT_APP_API_URL } = process.env
-    const { setVideoFile, deleteSingleFile } = useContext(filesContext)
-    const { dataForm, setDataForm, searchType, updateData } = useContext(databaseContext)
+    const { setVideoFile } = useContext(filesContext)
+    const { dataForm, setDataForm, searchType } = useContext(databaseContext)
 
     const { video_duration_formated, video_path, duration } = dataForm;
 
@@ -52,42 +50,16 @@ export default function VideoElement({ videoState, setVideoState }) {
         })
     }
     const handleDeleteVideoFile = () => {
-        const { video_path } = dataForm
+        window.URL.revokeObjectURL(dataForm.video_path)
 
-        // If you want delete before upload file
-        if (video_path.includes('blob:')) {
-            window.URL.revokeObjectURL(dataForm.video_path)
-            setDataForm({ ...dataForm, ...videoInitialState })
-            setVideoFile({})
-            return
-        }
+        setDataForm({ ...dataForm, ...videoInitialState, online: false })
 
-        // Delete file from the backend system
-        setOpenDialog(true)
+        setVideoFile({})
 
-        const handleDelete = async () => {
-            const responseFile = await deleteSingleFile(dataForm.video_path)
-
-            if (responseFile.resStatus === "success") {
-                const response = await updateData(videoInitialState)
-
-                if (response.resStatus === 'success') {
-                    setDataForm({ ...dataForm, ...videoInitialState })
-                    setVideoFile({})
-                    enqueueSnackbar('El video fue eliminado', { variant: 'success' })
-                }
-            }
-        }
-
-        return setDialog({
-            title: "Desea eliminar el video?",
-            content: "El video de: " + dataForm.title + " sera eliminado del sistema también",
-            actionFunction: handleDelete
-        })
+        setChange(true)
     }
     const handleVideoError = (e) => {
-        setVideoFile({})
-        setDataForm({ ...dataForm, video_path: '' })
+        alert('Video Error')
     }
 
     useEffect(() => {

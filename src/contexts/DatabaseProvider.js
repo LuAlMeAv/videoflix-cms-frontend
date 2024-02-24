@@ -3,58 +3,48 @@ import { globalContext } from "./GlobalProvider"
 
 export const databaseContext = createContext()
 
-const formInitialState = {
-    title: "",
-    original_title: "",
-    tagline: "",
-    season: "",
-    episode: "",
-    episode_name: "",
-    episode_number: "",
-    season_number: "",
-    year: "",
-    certification: "",
-    duration: "",
-    genres: "",
-    genre_ids: "",
-    online: false,
-    overview: "",
-    backdrop_path: "",
-    poster_path: "",
-    video_path: "",
-    video_duration: "",
-    video_duration_formated: "",
-    video_start: "",
-    video_end: "",
-    video_start_intro: "",
-    video_end_intro: ""
-}
-
 export default function DatabaseProvider({ children }) {
     const { setLoadingResponse } = useContext(globalContext)
     const { REACT_APP_API_URL } = process.env
 
-    // const REACT_APP_API_URL = 'http://192.168.1.222:5000'
+    const formInitialState = {
+        title: "",
+        original_title: "",
+        tagline: "",
+        season: "",
+        episode: "",
+        episode_name: "",
+        episode_number: "",
+        season_number: "",
+        year: "",
+        certification: "",
+        duration: "",
+        genres: "",
+        genre_ids: "",
+        online: false,
+        overview: "",
+        backdrop_path: "",
+        poster_path: "",
+        video_path: "",
+        video_duration: "",
+        video_duration_formated: "",
+        video_start: "",
+        video_end: "",
+        video_start_intro: "",
+        video_end_intro: ""
+    }
+
     const [searchType, setSearchType] = useState("movie")
     const [elementType, setElementType] = useState("movie")
     const [dataForm, setDataForm] = useState(formInitialState)
     const [allMovies, setAllMovies] = useState([])
+    const [allSeries, setAllSeries] = useState([])
 
     ////--- POST
-    const saveData = async (data) => {
+    const saveData = async (element_type, data) => {
         setLoadingResponse(true)
 
-        data.unique_title = uniqueTitle()
-        delete data.id
-
-        if (elementType === 'serie') {
-            data.seasons = []
-        }
-        if (elementType === 'season') {
-            data.episodes = []
-        }
-
-        return fetch(`${REACT_APP_API_URL}/db/new/${elementType}`, {
+        return fetch(`${REACT_APP_API_URL}/db/new/${element_type}`, {
             method: 'POST',
             headers: {
                 "Content-Type": "application/json"
@@ -77,15 +67,25 @@ export default function DatabaseProvider({ children }) {
             })
             .catch(catchFuntion)
     }
-    const getElementByName = async () => {
+    const getAllSeries = () => {
         setLoadingResponse(true)
-        return fetch(`${REACT_APP_API_URL}/db/${elementType}/t/${uniqueTitle()}`)
+        fetch(`${REACT_APP_API_URL}/db/all/series`)
+            .then(async (res) => {
+                const response = await res.json()
+                setAllSeries(response)
+                setLoadingResponse(false)
+            })
+            .catch(catchFuntion)
+    }
+    const getElementByName = async (element_type, unique_title) => {
+        setLoadingResponse(true)
+        return fetch(`${REACT_APP_API_URL}/db/${element_type}/t/${unique_title}`)
             .then(thenFuntion)
             .catch(catchFuntion)
     }
-    const getElementById = async (save_type, id) => {
+    const getElementById = async (type, id) => {
         setLoadingResponse(true)
-        return fetch(`${REACT_APP_API_URL}/db/${save_type}/${id}`)
+        return fetch(`${REACT_APP_API_URL}/db/${type}/${id}`)
             .then(thenFuntion)
             .catch(catchFuntion)
     }
@@ -95,7 +95,7 @@ export default function DatabaseProvider({ children }) {
                 return { ...element, video_status: 'error' }
             }
 
-            return await fetch(`${REACT_APP_API_URL}/file/online/${element.video_path}`)
+            return fetch(`${REACT_APP_API_URL}/file/online/${element.video_path}`)
                 .then(async (res) => {
                     const response = await res.json()
 
@@ -104,7 +104,7 @@ export default function DatabaseProvider({ children }) {
                     }
 
                     // If the file doesn't exist on disk, video_path is updated to null
-                    updateData({ video_path: '' }, element._id)
+                    updateData({ video_path: '', online: false }, element._id)
                     return { ...element, video_status: 'error' }
                 })
                 .catch(catchFuntion)
@@ -114,9 +114,9 @@ export default function DatabaseProvider({ children }) {
     }
 
     ////--- PUT
-    const updateData = async (newData, id) => {
+    const updateData = async (newData, id, element) => {
         setLoadingResponse(true)
-        return fetch(`${REACT_APP_API_URL}/db/${elementType}/${id || dataForm._id}`, {
+        return fetch(`${REACT_APP_API_URL}/db/${element || elementType}/${id || dataForm._id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
@@ -143,27 +143,6 @@ export default function DatabaseProvider({ children }) {
 
     const clearData = () => setDataForm(formInitialState)
 
-    const uniqueTitle = () => {
-        const { title, year, season_number, episode_number } = dataForm;
-
-        if (title === "") {
-            return undefined
-        }
-
-        const clear_accents = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        const clear_symbols = clear_accents.replace(/[^a-zA-Z0-9 ]/g, '')
-        const clear_spaces = clear_symbols.replaceAll(" ", "_")
-
-        const video_name = {
-            'movie': `${clear_spaces}-${year}-movie`,
-            'serie': `${clear_spaces}-${year}-serie`,
-            'season': `${clear_spaces}-s${season_number < 10 ? "0" : ""}${season_number * 1}`,
-            'episode': `${clear_spaces}-s${season_number < 10 ? "0" : ""}${season_number * 1}e${episode_number < 10 ? "0" : ""}${episode_number * 1}`,
-        }
-
-        return video_name[elementType].toLowerCase()
-    }
-
     const thenFuntion = async (res) => {
         setLoadingResponse(false)
         return await res.json()
@@ -176,12 +155,15 @@ export default function DatabaseProvider({ children }) {
     return (
         <databaseContext.Provider
             value={{
+                formInitialState,
                 searchType, setSearchType,
                 elementType, setElementType,
                 dataForm, setDataForm,
                 allMovies,
+                allSeries,
 
                 getAllMovies,
+                getAllSeries,
                 getElementByName,
                 getElementById,
 
@@ -190,7 +172,6 @@ export default function DatabaseProvider({ children }) {
                 deleteData,
 
                 clearData,
-                uniqueTitle,
             }}
         >
             {children}

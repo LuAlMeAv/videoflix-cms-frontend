@@ -7,7 +7,7 @@ export const filesContext = createContext()
 
 export default function FilesProvider({ children }) {
     const { REACT_APP_API_URL } = process.env
-    const { dataForm, setDataForm, uniqueTitle, elementType } = useContext(databaseContext)
+    const { dataForm, setDataForm } = useContext(databaseContext)
     const { setLoadingResponse } = useContext(globalContext)
 
     const { enqueueSnackbar } = useSnackbar();
@@ -19,7 +19,7 @@ export default function FilesProvider({ children }) {
 
 
     ////--- POST
-    const uploadSingleFile = async (file_type) => {
+    const uploadSingleFile = async (file_type, unique_title) => {
         setLoadingResponse(true)
 
         const formData = new FormData()
@@ -32,7 +32,7 @@ export default function FilesProvider({ children }) {
 
         formData.append('file', files[file_type])
 
-        const query = `${REACT_APP_API_URL}/file/upload/${file_type}/${uniqueTitle()}`
+        const query = `${REACT_APP_API_URL}/file/upload/${file_type}/${unique_title}`
 
         return fetch(query, {
             method: 'POST',
@@ -41,49 +41,39 @@ export default function FilesProvider({ children }) {
             .then(thenFuntion)
             .catch(catchFuntion)
     }
-    const uploadFiles = async () => {
-        let responses = {}
+    const uploadFiles = async (unique_title) => {
+        const responses = {}
 
-        // Upload video file
-        const uploadVideo = dataForm.video_path.includes('blob:')
-        if ((elementType === 'movie' || elementType === 'episode') && uploadVideo) {
-            const response = await uploadSingleFile('video')
-
-            if (response.resStatus === 'success') {
-                responses.video = response._res._id
+        if (posterFile.name) {
+            const uploadInfo = await uploadSingleFile('poster', unique_title)
+            if (uploadInfo.resStatus === 'success') {
+                responses.poster = uploadInfo._res._id
             } else {
-                enqueueSnackbar(response.message, { variant: response.resStatus })
+                window.URL.revokeObjectURL(dataForm.poster_path)
+                setDataForm({ ...dataForm, poster_path: '' })
+                enqueueSnackbar(uploadInfo.message, { variant: uploadInfo.resStatus })
             }
         }
-        // Upload poster file
-        const uploadPoster = dataForm.poster_path.includes('blob:')
-        if ((elementType === 'movie' || elementType === 'serie' || elementType === 'season') && uploadPoster) {
-            const response = await uploadSingleFile('poster')
-
-            if (response.resStatus === 'success') {
-                responses.poster = response._res._id
+        if (backdropFile.name) {
+            const uploadInfo = await uploadSingleFile('backdrop', unique_title)
+            if (uploadInfo.resStatus === 'success') {
+                responses.backdrop = uploadInfo._res._id
             } else {
-                enqueueSnackbar(response.message, { variant: response.resStatus })
+                window.URL.revokeObjectURL(dataForm.backdrop_path)
+                setDataForm({ ...dataForm, backdrop_path: '' })
+                enqueueSnackbar(uploadInfo.message, { variant: uploadInfo.resStatus })
             }
         }
-        // Upload backdrop file
-        const uploadBackdrop = dataForm.backdrop_path.includes('blob:')
-        if ((elementType === 'movie' || elementType === 'serie' || elementType === 'episode') && uploadBackdrop) {
-            const response = await uploadSingleFile('backdrop')
-
-            if (response.resStatus === 'success') {
-                responses.backdrop = response._res._id
+        if (videoFile.name) {
+            const uploadInfo = await uploadSingleFile('video', unique_title)
+            if (uploadInfo.resStatus === 'success') {
+                responses.video = uploadInfo._res._id
             } else {
-                enqueueSnackbar(response.message, { variant: response.resStatus })
+                window.URL.revokeObjectURL(dataForm.video_path)
+                setDataForm({ ...dataForm, video_path: '' })
+                enqueueSnackbar(uploadInfo.message, { variant: uploadInfo.resStatus })
             }
         }
-
-        setDataForm({
-            ...dataForm,
-            video_path: responses.video ? responses.video : dataForm.video_path,
-            poster_path: responses.poster ? responses.poster : dataForm.poster_path,
-            backdrop_path: responses.backdrop ? responses.backdrop : dataForm.backdrop_path
-        })
 
         return responses
     }
@@ -91,7 +81,7 @@ export default function FilesProvider({ children }) {
     ////--- GET
 
     ////--- PUT
-    const updateSingleFile = async (id) => {
+    const updateNameSingleFile = async (id, unique_title) => {
         setLoadingResponse(true)
 
         return fetch(`${REACT_APP_API_URL}/file/${id}`, {
@@ -99,30 +89,27 @@ export default function FilesProvider({ children }) {
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ unique_title: uniqueTitle() })
+            body: JSON.stringify({ unique_title })
         })
             .then(thenFuntion)
             .catch(catchFuntion)
     }
-    const updateFiles = async () => {
-        const responseFiles = await uploadFiles()
-
+    const updateNameFiles = async (unique_title) => {
         const responses = {};
 
         const { video_path, poster_path, backdrop_path } = dataForm;
 
         if (!poster_path.includes('http') && poster_path) {
-            responses.poster_path = await updateSingleFile(poster_path)
+            responses.poster_path = await updateNameSingleFile(poster_path, unique_title)
         }
         if (!backdrop_path.includes('http') && backdrop_path) {
-            responses.backdrop_path = await updateSingleFile(backdrop_path)
+            responses.backdrop_path = await updateNameSingleFile(backdrop_path, unique_title)
         }
-        if (!video_path.includes('http') && video_path) {
-            responses.video_path = await updateSingleFile(video_path)
+        if (!video_path?.includes('http') && video_path) {
+            responses.video_path = await updateNameSingleFile(video_path, unique_title)
         }
 
-        console.log(responses)
-        return responseFiles
+        return responses
     }
 
     ////--- DELETE
@@ -136,19 +123,23 @@ export default function FilesProvider({ children }) {
             .catch(catchFuntion)
     }
     const deleteFiles = async (element) => {
-        const { poster_path, backdrop_path, video_path } = element
+        const files = ['poster', 'backdrop', 'video']
 
-        const responses = {}
+        const responses = { allOk: true }
 
-        if (!poster_path.includes('http')) {
-            responses.poster_path = await deleteSingleFile(poster_path)
-        }
-        if (!backdrop_path.includes('http')) {
-            responses.backdrop_path = await deleteSingleFile(backdrop_path)
-        }
-        if (!video_path.includes('http')) {
-            responses.video_path = await deleteSingleFile(video_path)
-        }
+        files.forEach(async (file) => {
+            if (element[file + '_path'] && !element[file + '_path'].includes('http')) {
+                const responseDelete = await deleteSingleFile(element[file + '_path'])
+
+                responses[file + '_path'] = responseDelete
+
+                if (responseDelete.resStatus === 'error') {
+                    responses.allOk = false
+
+                    enqueueSnackbar(responseDelete.message, { variant: responseDelete.resStatus })
+                }
+            }
+        })
 
         return responses
     }
@@ -180,9 +171,9 @@ export default function FilesProvider({ children }) {
                 setBackdropFile,
 
                 uploadFiles,
-                updateFiles,
                 deleteFiles,
                 deleteSingleFile,
+                updateNameFiles,
             }}
         >
             {children}

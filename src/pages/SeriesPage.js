@@ -2,11 +2,12 @@ import { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { enqueueSnackbar } from 'notistack';
 import { IconButton, Tooltip } from '@mui/material';
-import { Cancel, CheckCircle, Delete, Visibility, WebAsset, WebAssetOff } from '@mui/icons-material';
+import { DeleteForeverOutlined, Visibility, WebAsset, WebAssetOff } from '@mui/icons-material';
 import { databaseContext } from '../contexts/DatabaseProvider';
 import { filesContext } from '../contexts/FilesProvider';
 import DeleteDialog2 from '../components/DeleteDialog';
 import TableElement from '../components/TableElement';
+
 
 const getFormatedDate = (p) => {
     const date = new Date(p.value)
@@ -19,7 +20,7 @@ const getFormatedDate = (p) => {
 }
 
 export default function AutoHeightOverlayNoSnap() {
-    const { getAllMovies, allMovies, deleteData } = useContext(databaseContext)
+    const { getAllSeries, allSeries, deleteData } = useContext(databaseContext)
     const { deleteFiles } = useContext(filesContext)
 
     const { REACT_APP_API_URL } = process.env
@@ -35,18 +36,23 @@ export default function AutoHeightOverlayNoSnap() {
 
         const handleDelete = async () => {
             const responseDeleteFiles = await deleteFiles(data)
+
             if (!responseDeleteFiles.allOk) {
                 return enqueueSnackbar('Error al eliminar los archivos, intente de nuevo', { variant: 'error' })
             }
 
-            const responseDB = await deleteData('movie', data._id)
+            const responseDB = await deleteData('serie', data._id)
+
+            if (responseDB.resStatus === 'success') {
+                getAllSeries()
+            }
 
             enqueueSnackbar(responseDB.message, { variant: responseDB.resStatus })
         }
 
         return setDialog({
-            title: "Desea eliminar la película?",
-            content: "Estas seguro que quieres eliminar la película: " + data.title,
+            title: "Desea eliminar la serie?",
+            content: "Estas seguro que quieres eliminar la serie: " + data.title,
             actionFunction: handleDelete
         })
     }
@@ -54,32 +60,23 @@ export default function AutoHeightOverlayNoSnap() {
     const renderPosterImage = (p) => {
         const { poster_path, title } = p.row
 
-        return <img src={poster_path.includes('http') ? poster_path : `${REACT_APP_API_URL}/file/${poster_path}`} alt={title} height='95%' />
+        return <img src={poster_path.includes('http') ? poster_path : `${REACT_APP_API_URL}/file/${poster_path}`} alt={title} height='100%' />
     }
     const renderButtonsAction = (p) => {
         return <>
             <Tooltip title='Ver detalles'>
-                <IconButton color='info' onClick={() => navigate("/view/movie/" + p.row._id)} >
+                <IconButton color='info' onClick={() => navigate("/view/serie/" + p.row._id)} >
                     <Visibility />
                 </IconButton>
             </Tooltip>
-            <Tooltip title='Eliminar'>
-                <IconButton color='error' onClick={() => handleClickDelete(p.row)}>
-                    <Delete />
-                </IconButton>
-            </Tooltip>
+            {p.row.seasons.length < 1 &&
+                <Tooltip title='Eliminar'>
+                    <IconButton color='error' onClick={() => handleClickDelete(p.row)}>
+                        <DeleteForeverOutlined />
+                    </IconButton>
+                </Tooltip>
+            }
         </>
-    }
-    const renderVideoOnline = (p) => {
-        return (
-            <Tooltip title={p.row.video_status === 'success' ? 'Video' : 'Sin video'}>
-                {p.row.video_status === 'success' ?
-                    <CheckCircle fontSize='small' color='success' />
-                    :
-                    <Cancel fontSize='small' color='error' />
-                }
-            </Tooltip>
-        )
     }
     const renderOnline = (p) => {
         return (
@@ -105,7 +102,14 @@ export default function AutoHeightOverlayNoSnap() {
             renderCell: renderPosterImage,
         },
         { field: 'title', headerName: 'Título', width: 270, headerAlign: 'center' },
-        { field: 'views', headerName: 'Vistas', width: 90, headerAlign: 'center', align: 'center' },
+        {
+            field: 'seasons',
+            headerName: 'Temporadas',
+            width: 90,
+            headerAlign: 'center',
+            align: 'center',
+            valueGetter: (p) => p.value.length
+        },
         {
             field: 'createdAt',
             headerName: 'Fecha de creación',
@@ -131,19 +135,10 @@ export default function AutoHeightOverlayNoSnap() {
             renderCell: renderOnline
         },
         {
-            field: 'video_status',
-            headerName: 'Video',
-            width: 80,
-            headerAlign: 'center',
-            align: "center",
-            renderCell: renderVideoOnline
-        },
-        {
             field: 'action',
             headerName: 'Acciones',
             width: 100,
             headerAlign: 'center',
-            align: 'center',
             disableColumnMenu: true,
             sortable: false,
             renderCell: renderButtonsAction,
@@ -160,14 +155,14 @@ export default function AutoHeightOverlayNoSnap() {
     }
 
     useEffect(() => {
-        getAllMovies()
+        getAllSeries()
         autoWidth()
 
         // eslint-disable-next-line
     }, [])
 
     return <>
-        <TableElement columns={columns} rows={allMovies} width={width} title='Películas' />
+        <TableElement rows={allSeries} columns={columns} width={width} title='Series' />
 
         {openDialog &&
             <DeleteDialog2 open={openDialog} setOpen={setOpenDialog} dialog={dialog} setDialog={setDialog} />
